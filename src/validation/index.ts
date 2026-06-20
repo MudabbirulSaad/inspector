@@ -10,11 +10,13 @@ import type {
   MemoryEvent,
   QaIssue,
   QaResult,
+  ScoutOutput,
 } from "../domain/types.js";
 
 export const validationBoundary = "validation" as const;
 
 export type SchemaContractName =
+  | "scout-output"
   | "finding"
   | "qa-result"
   | "knowledge-card"
@@ -39,6 +41,7 @@ export interface ContractValidator<T> {
 }
 
 export interface SchemaContractValidators {
+  "scout-output": ContractValidator<ScoutOutput>;
   finding: ContractValidator<Finding>;
   "qa-result": ContractValidator<QaResult>;
   "knowledge-card": ContractValidator<KnowledgeCard>;
@@ -49,6 +52,7 @@ export interface SchemaContractValidators {
 
 const schemaContracts = [
   "evidence",
+  "scout-output",
   "finding",
   "qa-result",
   "qa-issue",
@@ -63,6 +67,7 @@ const schemaContracts = [
 ] as const;
 
 const contractTitles: Record<SchemaContractName, string> = {
+  "scout-output": "Scout output",
   finding: "Finding",
   "qa-result": "QA result",
   "knowledge-card": "Knowledge card",
@@ -88,6 +93,7 @@ export async function createSchemaContractValidators(
   }
 
   return {
+    "scout-output": createValidator<ScoutOutput>(ajv, schemas, "scout-output"),
     finding: createValidator<Finding>(ajv, schemas, "finding"),
     "qa-result": createValidator<QaResult>(ajv, schemas, "qa-result"),
     "knowledge-card": createValidator<KnowledgeCard>(

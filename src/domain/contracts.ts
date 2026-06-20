@@ -1,4 +1,5 @@
 export const agentOutputContracts = [
+  "scout-output",
   "finding",
   "qa-result",
   "knowledge-card",
@@ -10,6 +11,7 @@ export type AgentOutputContract = (typeof agentOutputContracts)[number];
 
 export const domainModelContracts = [
   "evidence",
+  "scout-output",
   "finding",
   "qa-result",
   "qa-issue",

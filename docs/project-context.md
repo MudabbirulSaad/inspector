@@ -56,9 +56,10 @@ paths, line ranges, high-confidence finding evidence, QA finding references, and
 knowledge-card references to approved findings before semantic QA. The first
 runtime CLI vertical slice now parses `inspector run`, validates repository and
 objective paths, creates a run workspace, indexes the repository, initializes
-memory, runs Scout through a deterministic fake runner, validates Scout schema
-and evidence, writes artifacts, and prints progress. Full multi-agent
-orchestration is still pending.
+memory, builds an auditable Scout prompt with repository index context, runs
+Scout through a deterministic fake runner, validates Scout's structured schema
+and evidence, appends Scout findings to candidate memory, writes artifacts, and
+prints progress. Full multi-agent orchestration is still pending.
 
 ## Non-Goals
 

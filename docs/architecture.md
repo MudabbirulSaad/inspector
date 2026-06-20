@@ -101,10 +101,11 @@ Adapter responsibilities include:
 - CLI adapters parse arguments, handle user-visible errors, and call application
   use cases.
 - The first CLI `run` slice wires repository validation, objective loading, run
-  workspace creation, repository indexing, memory initialization, Scout
-  execution, schema validation, evidence validation, artifact writing, and
-  progress output. It remains Scout-only until the full scheduler-driven
-  orchestration flow is wired.
+  workspace creation, repository indexing, memory initialization, auditable
+  Scout prompt construction with repository index context, Scout execution,
+  structured schema validation, evidence validation, candidate finding memory
+  appends, artifact writing, and progress output. It remains Scout-only until
+  the full scheduler-driven orchestration flow is wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a

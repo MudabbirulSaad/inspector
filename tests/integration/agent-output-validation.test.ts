@@ -59,7 +59,7 @@ test("agent output validator selects the agent schema, parses valid JSON, and wr
 
   const result = await validateAgentOutput({
     workspace,
-    agent: getAgentContract("scout"),
+    agent: getAgentContract("architecture"),
     attempt: 1,
     rawOutput: await readExample("finding"),
     validators: await createSchemaContractValidators(),
@@ -68,7 +68,10 @@ test("agent output validator selects the agent schema, parses valid JSON, and wr
 
   assert.equal(result.valid, true);
   assert.equal(result.contract, "finding");
-  assert.equal(result.reportPath, "/tmp/run/validation/scout/attempt-1/report.json");
+  assert.equal(
+    result.reportPath,
+    "/tmp/run/validation/architecture/attempt-1/report.json",
+  );
   assert.equal(reports.writes.length, 1);
   assert.match(reports.writes[0]?.content ?? "", /"status": "passed"/);
 });
@@ -100,7 +103,7 @@ test("agent output validator reports missing required fields as schema violation
 
   const result = await validateAgentOutput({
     workspace,
-    agent: getAgentContract("scout"),
+    agent: getAgentContract("architecture"),
     attempt: 1,
     rawOutput: JSON.stringify(finding),
     validators: await createSchemaContractValidators(),

@@ -28,7 +28,40 @@ const scoutFinding = {
   confidence: 0.7,
 };
 
-function successfulScoutResult(stdout = JSON.stringify(scoutFinding)): AgentRunResult {
+const scoutOutput = {
+  projectType: {
+    value: "documentation-first TypeScript CLI",
+    evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+  },
+  detectedStack: [
+    {
+      name: "Node.js",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  importantFiles: [
+    {
+      path: "README.md",
+      reason: "Provides initial repository context.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  entryPoints: [
+    {
+      path: "README.md",
+      kind: "documentation",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  architectureImpression: {
+    summary: "Initial evidence only supports a shallow repository impression.",
+    evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+  },
+  openQuestions: ["Which runtime entrypoint should deeper agents inspect first?"],
+  findings: [scoutFinding],
+};
+
+function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunResult {
   return {
     stdout,
     stderr: "",
@@ -167,8 +200,36 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
         "utf8",
       ),
     ),
-    scoutFinding,
+    scoutOutput,
   );
+});
+
+test("CLI run sends Scout a prompt containing repository index context and Scout rules", async () => {
+  const fixture = await createFixture();
+  const runner = new FakeAgentRunner({ results: [successfulScoutResult()] });
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  const prompt = runner.requests[0]?.prompt ?? "";
+  assert.match(prompt, /# Agent Prompt: scout/);
+  assert.match(prompt, /Repository Index Summary/);
+  assert.match(prompt, /repo_summary/);
+  assert.match(prompt, /README\.md/);
+  assert.match(prompt, /Do not make deep unsupported claims/);
+  assert.match(prompt, /projectType/);
 });
 
 test("CLI run writes repository, memory, schema, and evidence artifacts", async () => {
@@ -201,6 +262,13 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   assert.match(
     await readFile(join(workspaceRoot, "memory", "blackboard.md"), "utf8"),
     /Run initialized/,
+  );
+  assert.deepEqual(
+    (await readFile(join(workspaceRoot, "memory", "findings.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as unknown),
+    [scoutFinding],
   );
   assert.match(
     await readFile(
@@ -235,7 +303,7 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
     clock: fixedClock,
     runner: new FakeAgentRunner({
       results: [
-        successfulScoutResult(JSON.stringify(scoutFinding)),
+        successfulScoutResult(JSON.stringify(scoutOutput)),
       ].map((agentResult) => ({
         ...agentResult,
         streamingEvents: [
@@ -255,4 +323,63 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.match(stdout.join("\n"), /Indexing repository/);
   assert.match(stdout.join("\n"), /\[scout:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
+});
+
+test("CLI run fails when Scout output is not schema-valid", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [successfulScoutResult(JSON.stringify({ findings: [scoutFinding] }))],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Scout schema validation failed/);
+});
+
+test("CLI run fails when Scout evidence cites missing repository lines", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidEvidenceOutput = {
+    ...scoutOutput,
+    findings: [
+      {
+        ...scoutFinding,
+        evidence: [{ file: "README.md", lineStart: 99, lineEnd: 100 }],
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [successfulScoutResult(JSON.stringify(invalidEvidenceOutput))],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Scout evidence validation failed/);
 });

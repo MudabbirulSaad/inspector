@@ -7,6 +7,7 @@ import { createSchemaContractValidators } from "../../src/validation/index.js";
 type JsonObject = Record<string, unknown>;
 
 const runtimeContracts = [
+  "scout-output",
   "finding",
   "qa-result",
   "knowledge-card",
@@ -54,6 +55,10 @@ test("runtime validators accept valid examples for every agent output contract",
 test("runtime validators reject invalid artifacts for every agent output contract", async () => {
   const validators = await createSchemaContractValidators();
   const invalidArtifacts = {
+    "scout-output": {
+      ...(await readExample("scout-output")),
+      projectType: { value: "Node.js", evidence: [] },
+    },
     finding: { ...(await readExample("finding")), confidence: 1.5 },
     "qa-result": { ...(await readExample("qa-result")), status: "unknown" },
     "knowledge-card": {

@@ -8,6 +8,7 @@ import {
 
 test("domain exposes the supported agent output contract names", () => {
   assert.deepEqual(agentOutputContracts, [
+    "scout-output",
     "finding",
     "qa-result",
     "knowledge-card",
@@ -19,6 +20,7 @@ test("domain exposes the supported agent output contract names", () => {
 test("domain exposes schema-backed model contract names", () => {
   assert.deepEqual(domainModelContracts, [
     "evidence",
+    "scout-output",
     "finding",
     "qa-result",
     "qa-issue",

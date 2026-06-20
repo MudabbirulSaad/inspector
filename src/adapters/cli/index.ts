@@ -3,14 +3,16 @@ import { basename, join, resolve } from "node:path";
 
 import { getAgentContract } from "../../agents/index.js";
 import {
+  appendSwarmFinding,
   appendSwarmBlackboardSnapshot,
+  buildAgentPrompt,
   createInspectionRunWorkspace,
   executeAgentRun,
   indexTargetRepository,
   validateAgentOutput,
   validateEvidenceReferences,
 } from "../../application/index.js";
-import type { Finding, RunConfig } from "../../domain/types.js";
+import type { Evidence, Finding, RunConfig, ScoutOutput } from "../../domain/types.js";
 import type {
   AgentRunResult,
   AgentRunner,
@@ -23,6 +25,8 @@ import { FakeAgentRunner } from "../codex/index.js";
 import {
   NodeRepositoryIndexWriter,
   NodeRepositoryReader,
+  NodePromptArtifactWriter,
+  NodePromptTemplateReader,
   NodeRunWorkspaceStore,
   NodeSwarmMemoryStore,
   NodeValidationReportWriter,
@@ -107,13 +111,33 @@ export async function runInspectorCli(
       memory: new NodeSwarmMemoryStore(workspace),
     });
 
+    const validators = await createSchemaContractValidators();
+    const scoutPrompt = await buildAgentPrompt({
+      agentId: "scout",
+      attempt: 1,
+      workspace,
+      templates: new NodePromptTemplateReader("prompts"),
+      artifacts: new NodePromptArtifactWriter(),
+      objective,
+      targetRepoContext: config.target,
+      repoIndexSummary: await readRepositoryIndexPromptContext(workspace),
+      previousOutputs: [],
+      memorySnapshot: await readFile(
+        join(workspace.folders.memory, "blackboard.md"),
+        "utf8",
+      ),
+      outputSchema: JSON.parse(
+        await readFile("schemas/scout-output.schema.json", "utf8"),
+      ) as unknown,
+    });
+
     printProgress(stdout, command.verbose, "Running Scout");
     const runner = request.runner ?? createDefaultScoutRunner(repositoryFiles);
     const scoutRun = await executeAgentRun({
       runner,
       agentId: "scout",
       attempt: 1,
-      prompt: objective,
+      prompt: scoutPrompt.prompt,
       workspaceRoot: workspace.root,
       onStreamingEvent: (event) => {
         if (command.verbose) {
@@ -124,7 +148,6 @@ export async function runInspectorCli(
     await writeScoutOutput(workspace, scoutRun.stdout);
 
     printProgress(stdout, command.verbose, "Validating Scout schema");
-    const validators = await createSchemaContractValidators();
     const schemaResult = await validateAgentOutput({
       workspace,
       agent: getAgentContract("scout"),
@@ -139,10 +162,12 @@ export async function runInspectorCli(
       return { exitCode: 1, workspace };
     }
 
+    const scoutOutput = schemaResult.value as ScoutOutput;
+
     printProgress(stdout, command.verbose, "Validating Scout evidence");
     const evidenceResult = await validateEvidenceReferences({
       repositoryFiles,
-      findings: [schemaResult.value as Finding],
+      findings: scoutEvidenceFindings(scoutOutput),
     });
 
     await writeEvidenceValidationReport(workspace, evidenceResult);
@@ -150,6 +175,15 @@ export async function runInspectorCli(
     if (!evidenceResult.valid) {
       stderr(`Scout evidence validation failed: ${evidenceResult.errors[0]?.message}`);
       return { exitCode: 1, workspace };
+    }
+
+    const memory = new NodeSwarmMemoryStore(workspace);
+    for (const finding of scoutOutput.findings) {
+      await appendSwarmFinding({
+        finding,
+        memory,
+        validator: validators.finding,
+      });
     }
 
     stdout(`Inspection run workspace: ${workspace.root}`);
@@ -242,20 +276,48 @@ function createDefaultScoutRunner(
   const lineEnd = Math.max(1, Math.min(citedFile.lineCount, 1));
   const result: AgentRunResult = {
     stdout: `${JSON.stringify({
-      id: "finding-scout-001",
-      agent: "scout",
-      severity: "info",
-      claim: "The inspected repository has an initial file for Scout review.",
-      evidence: [
+      projectType: {
+        value: "repository requiring inspection",
+        evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+      },
+      detectedStack: [],
+      importantFiles: [
         {
-          file: citedFile.path,
-          lineStart: 1,
-          lineEnd,
+          path: citedFile.path,
+          reason: "Initial file available for Scout review.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
         },
       ],
-      recommendation: "Use this repository inventory as the starting point for deeper inspection.",
-      confidence: 0.5,
-      validation: ["schema-valid", "evidence-valid"],
+      entryPoints: [
+        {
+          path: citedFile.path,
+          kind: "initial inspection file",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      architectureImpression: {
+        summary: "Scout has only enough evidence for a shallow initial repository impression.",
+        evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+      },
+      openQuestions: ["Which source entrypoint should deeper agents inspect first?"],
+      findings: [
+        {
+          id: "finding-scout-001",
+          agent: "scout",
+          severity: "info",
+          claim: "The inspected repository has an initial file for Scout review.",
+          evidence: [
+            {
+              file: citedFile.path,
+              lineStart: 1,
+              lineEnd,
+            },
+          ],
+          recommendation: "Use this repository inventory as the starting point for deeper inspection.",
+          confidence: 0.5,
+          validation: ["schema-valid", "evidence-valid"],
+        },
+      ],
     })}\n`,
     stderr: "",
     exitCode: 0,
@@ -266,6 +328,87 @@ function createDefaultScoutRunner(
   };
 
   return new FakeAgentRunner({ results: [result] });
+}
+
+async function readRepositoryIndexPromptContext(
+  workspace: RunWorkspace,
+): Promise<Record<string, unknown>> {
+  return {
+    repo_summary: JSON.parse(
+      await readFile(join(workspace.folders.repoIndex, "repo_summary.json"), "utf8"),
+    ) as unknown,
+    important_files: JSON.parse(
+      await readFile(
+        join(workspace.folders.repoIndex, "important_files.json"),
+        "utf8",
+      ),
+    ) as unknown,
+    detected_stack: JSON.parse(
+      await readFile(
+        join(workspace.folders.repoIndex, "detected_stack.json"),
+        "utf8",
+      ),
+    ) as unknown,
+    detected_commands: JSON.parse(
+      await readFile(
+        join(workspace.folders.repoIndex, "detected_commands.json"),
+        "utf8",
+      ),
+    ) as unknown,
+    file_tree: await readFile(
+      join(workspace.folders.repoIndex, "file_tree.txt"),
+      "utf8",
+    ),
+  };
+}
+
+function scoutEvidenceFindings(output: ScoutOutput): Finding[] {
+  return [
+    evidenceFinding(
+      "finding-scout-project-type",
+      `Scout identified project type: ${output.projectType.value}`,
+      output.projectType.evidence,
+    ),
+    ...output.detectedStack.map((signal, index) =>
+      evidenceFinding(
+        `finding-scout-stack-${index + 1}`,
+        `Scout detected stack signal: ${signal.name}`,
+        signal.evidence,
+      ),
+    ),
+    ...output.importantFiles.map((file, index) =>
+      evidenceFinding(
+        `finding-scout-important-file-${index + 1}`,
+        `Scout marked ${file.path} as important: ${file.reason}`,
+        file.evidence,
+      ),
+    ),
+    ...output.entryPoints.map((entryPoint, index) =>
+      evidenceFinding(
+        `finding-scout-entrypoint-${index + 1}`,
+        `Scout marked ${entryPoint.path} as an entry point: ${entryPoint.kind}`,
+        entryPoint.evidence,
+      ),
+    ),
+    evidenceFinding(
+      "finding-scout-architecture-impression",
+      output.architectureImpression.summary,
+      output.architectureImpression.evidence,
+    ),
+    ...output.findings,
+  ];
+}
+
+function evidenceFinding(id: string, claim: string, evidence: Evidence[]): Finding {
+  return {
+    id,
+    agent: "scout",
+    severity: "info",
+    claim,
+    evidence,
+    recommendation: "Use this Scout observation only as initial inspection context.",
+    confidence: 0.5,
+  };
 }
 
 async function writeScoutOutput(

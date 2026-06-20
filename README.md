@@ -2,7 +2,7 @@
 
 `inspector` is a Node.js and TypeScript CLI for AI-assisted codebase inspection. It will coordinate specialist inspection agents, validate evidence-backed findings, and produce documentation artifacts that future coding agents can reuse.
 
-The first runtime slice supports a Scout-only inspection run that creates a run workspace, indexes a repository, initializes memory, runs Scout through a deterministic fake runner, and validates Scout output.
+The first runtime slice supports a Scout-only inspection run that creates a run workspace, indexes a repository, initializes memory, builds an audited Scout prompt from repository index context, runs Scout through a deterministic fake runner, validates structured Scout output and evidence, and appends Scout findings to candidate memory.
 
 ```bash
 inspector run <repo-path> --objective <objective-file> --out <output-path> --verbose

@@ -14,6 +14,14 @@ consistent across artifacts.
 
 `finding.schema.json` describes an inspection finding. It requires an agent name, severity, claim, evidence, recommendation, and confidence score. Evidence must include at least one file path and line range.
 
+## Scout Output
+
+`scout-output.schema.json` describes the Scout agent's repository map. It
+requires project type, detected stack, important files, entry points, an initial
+architecture impression, open questions, and structured findings. Concrete
+Scout claims must cite repository-relative evidence; open questions are the
+place for uncertainty rather than unsupported deep conclusions.
+
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required.
@@ -54,8 +62,9 @@ aligned with these schemas.
 
 The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
-validators for findings, QA results, knowledge cards, memory events, and
-inspection reports without duplicating schema definitions in TypeScript.
+validators for Scout output, findings, QA results, knowledge cards, memory
+events, and inspection reports without duplicating schema definitions in
+TypeScript.
 
 ## Agent Output Validation
 

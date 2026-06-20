@@ -37,9 +37,11 @@ local command execution. Agent lifecycle transitions are now modeled as an
 auditable state machine with status artifacts written to agent attempt folders.
 Agent output validation now parses raw JSON, selects schemas from agent
 contracts, reports malformed JSON and schema violations, and writes validation
-reports to the run workspace. Evidence validation now checks cited files, line
-ranges, repository-contained paths, high-confidence finding evidence, QA finding
-references, and knowledge-card approved-finding references.
+reports to the run workspace. Scout now has a structured output contract for
+repository mapping and candidate findings. Evidence validation now checks cited
+files, line ranges, repository-contained paths, high-confidence finding
+evidence, QA finding references, and knowledge-card approved-finding
+references.
 
 ## Fixed Milestones
 
@@ -825,4 +827,51 @@ git status
 
 ```bash
 feat(cli): run scout inspection vertical slice
+```
+
+### Milestone 19: Scout Agent Integration
+
+#### Goal
+
+Fully integrate the Scout agent into the first runtime CLI flow.
+
+#### Tasks
+
+- Added `scout-output.schema.json` and a matching TypeScript `ScoutOutput`
+  domain model.
+- Updated the Scout registry contract to validate `scout-output` rather than a
+  single finding.
+- Required Scout output to include project type, detected stack, important
+  files, entry points, initial architecture impression, open questions, and
+  structured findings.
+- Required concrete Scout claims to carry traceable evidence, while unsupported
+  uncertainty belongs in open questions.
+- Built the Scout prompt from the existing prompt template system with
+  repository index context, memory snapshot, and the Scout output schema.
+- Validated Scout output schema and evidence before appending structured Scout
+  findings to candidate memory.
+- Preserved schema and evidence failure paths without appending invalid
+  findings.
+
+#### TDD
+
+Added CLI integration coverage for repository-index prompt context, Scout output
+parsing, candidate memory append, schema-invalid Scout output failure, and
+evidence-invalid Scout output failure. Updated runtime validation and schema
+example coverage for the new Scout output contract.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): integrate evidence-backed scout agent
 ```

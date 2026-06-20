@@ -1,0 +1,80 @@
+{
+  "projectType": {
+    "value": "Node.js TypeScript CLI",
+    "evidence": [
+      {
+        "file": "package.json",
+        "lineStart": 1,
+        "lineEnd": 20
+      }
+    ]
+  },
+  "detectedStack": [
+    {
+      "name": "TypeScript",
+      "evidence": [
+        {
+          "file": "tsconfig.json",
+          "lineStart": 1,
+          "lineEnd": 8
+        }
+      ]
+    }
+  ],
+  "importantFiles": [
+    {
+      "path": "README.md",
+      "reason": "Project overview and usage documentation.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 12
+        }
+      ]
+    }
+  ],
+  "entryPoints": [
+    {
+      "path": "src/index.ts",
+      "kind": "CLI entrypoint",
+      "evidence": [
+        {
+          "file": "src/index.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "architectureImpression": {
+    "summary": "The repository appears to separate application code from adapters at a shallow inspection level.",
+    "evidence": [
+      {
+        "file": "src/application/index.ts",
+        "lineStart": 1,
+        "lineEnd": 12
+      }
+    ]
+  },
+  "openQuestions": [
+    "Which adapter paths should downstream agents inspect first?"
+  ],
+  "findings": [
+    {
+      "id": "finding-scout-001",
+      "agent": "scout",
+      "severity": "info",
+      "claim": "The repository exposes a TypeScript CLI entrypoint.",
+      "evidence": [
+        {
+          "file": "src/index.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ],
+      "recommendation": "Use the CLI entrypoint as one starting point for deeper inspection.",
+      "confidence": 0.7
+    }
+  ]
+}

@@ -22,7 +22,7 @@ test("agent registry exposes the fixed V1 agent contracts", () => {
       required: contract.required,
     })),
     [
-      { id: "scout", outputSchema: "finding", required: true },
+      { id: "scout", outputSchema: "scout-output", required: true },
       { id: "architecture", outputSchema: "finding", required: true },
       { id: "pattern_miner", outputSchema: "finding", required: true },
       { id: "qa_verifier", outputSchema: "qa-result", required: true },
@@ -130,7 +130,7 @@ test("agent registry callers cannot mutate stored contract definitions", () => {
 
   assert.deepEqual(getAgentContract("scout").dependencies, []);
   assert.deepEqual(getAgentContract("scout").outputArtifacts, [
-    "agents/scout/findings.json",
+    "agents/scout/output.json",
   ]);
   assert.deepEqual(getAgentContract("scout").qaRevisionOwnership, {
     ownsRevisionFor: ["scout"],

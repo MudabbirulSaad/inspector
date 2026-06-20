@@ -61,6 +61,44 @@ export interface Finding {
   validation?: string[];
 }
 
+export interface ScoutEvidenceSummary {
+  value: string;
+  evidence: Evidence[];
+}
+
+export interface ScoutStackSignal {
+  name: string;
+  version?: string;
+  evidence: Evidence[];
+}
+
+export interface ScoutImportantFile {
+  path: string;
+  reason: string;
+  evidence: Evidence[];
+}
+
+export interface ScoutEntryPoint {
+  path: string;
+  kind: string;
+  evidence: Evidence[];
+}
+
+export interface ScoutArchitectureImpression {
+  summary: string;
+  evidence: Evidence[];
+}
+
+export interface ScoutOutput {
+  projectType: ScoutEvidenceSummary;
+  detectedStack: ScoutStackSignal[];
+  importantFiles: ScoutImportantFile[];
+  entryPoints: ScoutEntryPoint[];
+  architectureImpression: ScoutArchitectureImpression;
+  openQuestions: string[];
+  findings: Finding[];
+}
+
 export interface QaCheck {
   name: string;
   status: QaStatus;
