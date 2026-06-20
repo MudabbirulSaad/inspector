@@ -231,6 +231,56 @@ export interface TestingStrategyOutput {
   findings: Finding[];
 }
 
+export interface TradeoffAnalystDecision {
+  decision: string;
+  tradeoff: string;
+  consequence: string;
+  evidence: Evidence[];
+  confidence: number;
+}
+
+export interface TradeoffAnalystRisk {
+  risk: string;
+  tradeoff: string;
+  consequence: string;
+  evidence: Evidence[];
+  confidence: number;
+}
+
+export interface TradeoffAnalystWeakDecision {
+  decision: string;
+  tradeoff: string;
+  risk: string;
+  evidence: Evidence[];
+  confidence: number;
+}
+
+export interface TradeoffAnalystAssumption {
+  assumption: string;
+  whyItMatters: string;
+  evidence: Evidence[];
+  confidence: number;
+}
+
+export interface TradeoffAnalystAdaptationWarning {
+  warning: string;
+  repoSpecificContext: string;
+  adaptationAdvice: string;
+  evidence: Evidence[];
+  confidence: number;
+}
+
+export interface TradeoffAnalystOutput {
+  strongDecisions: TradeoffAnalystDecision[];
+  weakDecisions: TradeoffAnalystWeakDecision[];
+  overengineeringRisks: TradeoffAnalystRisk[];
+  underengineeringRisks: TradeoffAnalystRisk[];
+  hiddenAssumptions: TradeoffAnalystAssumption[];
+  agentSafetyRisks: TradeoffAnalystRisk[];
+  adaptationWarnings: TradeoffAnalystAdaptationWarning[];
+  findings: Finding[];
+}
+
 export interface QaCheck {
   name: string;
   status: QaStatus;

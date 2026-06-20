@@ -11,6 +11,7 @@ const contracts = [
   "pattern-miner-output",
   "flow-tracer-output",
   "testing-strategy-output",
+  "tradeoff-analyst-output",
   "finding",
   "qa-result",
   "qa-issue",

@@ -105,12 +105,12 @@ Adapter responsibilities include:
 - The CLI `run` adapter validates local repository and objective paths, wires
   concrete filesystem, memory, validation, prompt, schema, QA artifact, final
   document writer, and runner adapters, prints user-visible progress, and calls the
-  Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy plus QA
+  Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst plus QA
   application use case.
-- The current Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy application use case creates the
+- The current Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst application use case creates the
   run workspace, indexes the repository, initializes memory, builds auditable
   prompts, runs Scout before Architecture before Pattern Miner before Flow
-  Tracer before Testing Strategy, validates structured schema and cited
+  Tracer before Testing Strategy before Tradeoff Analyst, validates structured schema and cited
   evidence, writes runtime artifacts through ports, appends candidate findings
   from schema-valid and evidence-valid outputs, then runs deterministic QA verification. QA revision requests are grouped by owner
   agent, routed only to that owner as the next attempt, revalidated against the
@@ -218,12 +218,12 @@ V1 requires these agents in deterministic order:
 - `pattern_miner`
 - `flow_tracer`
 - `testing_strategy`
+- `tradeoff_analyst`
 - `qa_verifier`
 - `final_reviewer`
 
 Later optional agents are registered but not required for the V1 execution set:
 
-- `tradeoff_analyst`
 - `rag_card_distiller`
 
 Scheduler code should consume the registry or derived dependency graph rather
@@ -246,6 +246,14 @@ test types found, quality gates, protected behavior, unprotected behavior,
 command evidence, testing risks, recommendations, and findings. It must mark
 commands as `not-run` unless the agent has command evidence that they ran, and
 passed quality gates require matching passed command evidence.
+
+Tradeoff Analyst depends on validated Architecture, Pattern Miner, and Testing
+Strategy output. Its output contract is `tradeoff-analyst-output`, which
+records strong decisions, weak decisions, overengineering risks,
+underengineering risks, hidden assumptions, agent-safety risks, adaptation
+warnings, and findings. It must connect every tradeoff category to file and
+line evidence, separate repository-specific tradeoffs from adaptation advice,
+and reject praise-only output.
 
 ## Scheduler DAG
 
@@ -288,8 +296,8 @@ When QA fails or requests review, the application creates a revision request tha
 records the target finding, failing checks, rationale, required corrections, and
 responsible follow-up agent. Revised outputs must re-enter validation before
 they can affect final artifacts. The current runtime slice routes Scout,
-Architecture, Pattern Miner, Flow Tracer, and Testing Strategy revisions back
-only to the owning agent, stores
+Architecture, Pattern Miner, Flow Tracer, Testing Strategy, and Tradeoff
+Analyst revisions back only to the owning agent, stores
 the retry as a separate attempt, includes previous output plus QA issues in the
 repair prompt, revalidates schema and evidence, and leaves final unresolved QA
 issues and revision requests in artifacts when the retry limit is reached.

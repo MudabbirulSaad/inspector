@@ -1278,3 +1278,52 @@ git status
 ```bash
 feat(agents): inspect repository testing strategy
 ```
+
+### Milestone 28: Tradeoff Analyst Agent
+
+#### Goal
+
+Add Tradeoff Analyst Agent.
+
+#### Tasks
+
+- Promoted `tradeoff_analyst` into the required V1 runtime registry after
+  `testing_strategy` and before `qa_verifier`.
+- Added `tradeoff-analyst-output.schema.json` and a matching example for strong
+  decisions, weak decisions, overengineering risks, underengineering risks,
+  hidden assumptions, agent-safety risks, adaptation warnings, and findings.
+- Required each tradeoff category to cite repository-relative file and line
+  evidence.
+- Added executable claim validation that rejects Tradeoff Analyst output that
+  only praises strong decisions without naming weak decisions, risks,
+  assumptions, safety risks, or adaptation warnings.
+- Added a Tradeoff Analyst prompt template that separates repo-specific
+  tradeoffs from adaptation advice and warns against unsupported tradeoffs.
+- Wired the CLI runtime use case to build the Tradeoff Analyst prompt from
+  prior specialist outputs, run the agent, save output, validate schema,
+  validate nested evidence, append candidate findings, include findings in QA,
+  and route owner revisions.
+
+#### TDD
+
+Added tests for registry dependency placement, schema/example validation,
+runtime validator support, risk/evidence output, unsupported tradeoff
+rejection, praise-only output rejection, CLI Tradeoff Analyst
+prompt/output/evidence artifacts, QA inclusion, RAG warning-card routing, and
+owner retry sequencing.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): analyze architecture tradeoffs and risks
+```

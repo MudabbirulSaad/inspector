@@ -60,6 +60,18 @@ testing risks, recommendations, and candidate findings. Command status must be
 and run timestamp, and the application validator rejects passed quality-gate
 claims unless matching passed command evidence exists.
 
+## Tradeoff Analyst Output
+
+`tradeoff-analyst-output.schema.json` describes the Tradeoff Analyst agent's
+decision and risk assessment. It records strong decisions, weak decisions,
+overengineering risks, underengineering risks, hidden assumptions,
+agent-safety risks, adaptation warnings, and candidate findings. Every
+tradeoff category requires repository-relative file and line evidence.
+Adaptation warnings keep repo-specific context separate from advice about
+copying the approach elsewhere. The application validator rejects outputs that
+only praise strong decisions without naming any weak decision, risk,
+assumption, safety risk, or adaptation warning.
+
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required. The runtime QA verifier also writes `qa/readiness.json` with a deterministic readiness score derived from approved findings divided by total candidate findings.
@@ -108,9 +120,9 @@ aligned with these schemas.
 The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
 validators for Scout output, Architecture output, Pattern Miner output, Flow
-Tracer output, Testing Strategy output, findings, QA results, knowledge cards,
-memory events, QA issues, and inspection reports without duplicating schema
-definitions in TypeScript.
+Tracer output, Testing Strategy output, Tradeoff Analyst output, findings, QA
+results, knowledge cards, memory events, QA issues, and inspection reports
+without duplicating schema definitions in TypeScript.
 
 ## Agent Output Validation
 
@@ -145,8 +157,8 @@ declares its id, role, description, dependencies, output artifacts, output
 schema, retry policy, required/optional policy, and QA revision ownership.
 
 The required V1 agents are `scout`, `architecture`, `pattern_miner`,
-`flow_tracer`, `testing_strategy`, `qa_verifier`, and `final_reviewer`. Later
-optional agents are `tradeoff_analyst` and `rag_card_distiller`.
+`flow_tracer`, `testing_strategy`, `tradeoff_analyst`, `qa_verifier`, and
+`final_reviewer`. The later optional agent is `rag_card_distiller`.
 
 ## Prompt Templates
 

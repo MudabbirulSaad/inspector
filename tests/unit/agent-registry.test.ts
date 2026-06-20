@@ -18,6 +18,7 @@ test("agent registry exposes the fixed V1 agent contracts", () => {
       "pattern_miner",
       "flow_tracer",
       "testing_strategy",
+      "tradeoff_analyst",
       "qa_verifier",
       "final_reviewer",
     ],
@@ -47,6 +48,11 @@ test("agent registry exposes the fixed V1 agent contracts", () => {
         outputSchema: "testing-strategy-output",
         required: true,
       },
+      {
+        id: "tradeoff_analyst",
+        outputSchema: "tradeoff-analyst-output",
+        required: true,
+      },
       { id: "qa_verifier", outputSchema: "qa-result", required: true },
       {
         id: "final_reviewer",
@@ -71,7 +77,7 @@ test("agent registry separates required V1 agents from optional later agents", (
 
   assert.deepEqual(
     laterContracts.map((contract) => contract.id),
-    ["tradeoff_analyst", "rag_card_distiller"],
+    ["rag_card_distiller"],
   );
 
   assert.deepEqual(
@@ -81,7 +87,6 @@ test("agent registry separates required V1 agents from optional later agents", (
       required: contract.required,
     })),
     [
-      { id: "tradeoff_analyst", outputSchema: "finding", required: false },
       {
         id: "rag_card_distiller",
         outputSchema: "knowledge-card",
@@ -98,11 +103,13 @@ test("agent registry exposes the dependency graph for scheduled execution", () =
     pattern_miner: ["architecture"],
     flow_tracer: ["architecture", "pattern_miner"],
     testing_strategy: ["architecture", "pattern_miner", "flow_tracer"],
+    tradeoff_analyst: ["architecture", "pattern_miner", "testing_strategy"],
     qa_verifier: [
       "architecture",
       "pattern_miner",
       "flow_tracer",
       "testing_strategy",
+      "tradeoff_analyst",
     ],
     final_reviewer: ["qa_verifier"],
   });
@@ -115,9 +122,9 @@ test("agent registry returns contracts in deterministic execution order", () => 
     "pattern_miner",
     "flow_tracer",
     "testing_strategy",
+    "tradeoff_analyst",
     "qa_verifier",
     "final_reviewer",
-    "tradeoff_analyst",
     "rag_card_distiller",
   ];
 
@@ -158,6 +165,9 @@ test("agent registry output artifacts match the attempt-based runtime layout", (
   ]);
   assert.deepEqual(getAgentContract("testing_strategy").outputArtifacts, [
     "agents/testing_strategy/attempt-{attempt}/output.json",
+  ]);
+  assert.deepEqual(getAgentContract("tradeoff_analyst").outputArtifacts, [
+    "agents/tradeoff_analyst/attempt-{attempt}/output.json",
   ]);
   assert.deepEqual(getAgentContract("qa_verifier").outputArtifacts, [
     "qa/results.json",

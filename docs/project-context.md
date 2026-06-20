@@ -61,12 +61,12 @@ writes QA artifacts, appends approved/rejected findings to run memory, and
 computes a deterministic readiness score. The runtime CLI slice now parses
 `inspector run`, validates repository and objective paths, wires concrete
 adapters, prints progress, and calls a Scout/Architecture/Pattern Miner/Flow
-Tracer/Testing Strategy plus QA
+Tracer/Testing Strategy/Tradeoff Analyst plus QA
 application use case. That use case creates a run workspace, indexes the
 repository, initializes memory, builds auditable Scout, Architecture, and
-Pattern Miner prompts, then builds Flow Tracer and Testing Strategy prompts
+Pattern Miner prompts, then builds Flow Tracer, Testing Strategy, and Tradeoff Analyst prompts
 from prior specialist outputs. It runs Scout before Architecture before Pattern
-Miner before Flow Tracer before Testing Strategy through the runner port,
+Miner before Flow Tracer before Testing Strategy before Tradeoff Analyst through the runner port,
 validates structured schemas and cited evidence,
 writes artifacts through ports, appends candidate findings from schema-valid and
 evidence-valid outputs, runs QA, and routes QA revision requests back only to
@@ -76,6 +76,11 @@ Testing Strategy uses a dedicated `testing-strategy-output` contract for test
 types found, quality gates, protected behavior, unprotected behavior, command
 evidence, testing risks, recommendations, and candidate findings; it marks
 commands as `not-run` unless command evidence proves they ran.
+Tradeoff Analyst uses a dedicated `tradeoff-analyst-output` contract for strong
+decisions, weak decisions, overengineering risks, underengineering risks, hidden
+assumptions, agent-safety risks, adaptation warnings, and candidate findings.
+It requires traceable evidence for each tradeoff category, separates
+repo-specific tradeoffs from adaptation advice, and rejects praise-only output.
 Owner retries preserve prior attempts, include the previous output and QA issue
 in the repair prompt, revalidate schema and evidence, update memory, rerun QA,
 and leave unresolved final revision requests visible when the retry policy is

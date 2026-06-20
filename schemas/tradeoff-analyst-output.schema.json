@@ -1,0 +1,138 @@
+{
+  "$id": "tradeoff-analyst-output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tradeoff Analyst output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "strongDecisions",
+    "weakDecisions",
+    "overengineeringRisks",
+    "underengineeringRisks",
+    "hiddenAssumptions",
+    "agentSafetyRisks",
+    "adaptationWarnings",
+    "findings"
+  ],
+  "properties": {
+    "strongDecisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decision" }
+    },
+    "weakDecisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/weakDecision" }
+    },
+    "overengineeringRisks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "underengineeringRisks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "hiddenAssumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/assumption" }
+    },
+    "agentSafetyRisks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "adaptationWarnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/adaptationWarning" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    }
+  },
+  "$defs": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "tradeoff", "consequence", "evidence", "confidence"],
+      "properties": {
+        "decision": { "type": "string", "minLength": 1 },
+        "tradeoff": { "type": "string", "minLength": 1 },
+        "consequence": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "weakDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "tradeoff", "risk", "evidence", "confidence"],
+      "properties": {
+        "decision": { "type": "string", "minLength": 1 },
+        "tradeoff": { "type": "string", "minLength": 1 },
+        "risk": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk", "tradeoff", "consequence", "evidence", "confidence"],
+      "properties": {
+        "risk": { "type": "string", "minLength": 1 },
+        "tradeoff": { "type": "string", "minLength": 1 },
+        "consequence": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assumption", "whyItMatters", "evidence", "confidence"],
+      "properties": {
+        "assumption": { "type": "string", "minLength": 1 },
+        "whyItMatters": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "adaptationWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "warning",
+        "repoSpecificContext",
+        "adaptationAdvice",
+        "evidence",
+        "confidence"
+      ],
+      "properties": {
+        "warning": { "type": "string", "minLength": 1 },
+        "repoSpecificContext": { "type": "string", "minLength": 1 },
+        "adaptationAdvice": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

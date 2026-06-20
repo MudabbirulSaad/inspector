@@ -8,7 +8,10 @@ import type {
   ContractValidationError,
   SchemaContractValidators,
 } from "../validation/index.js";
-import type { TestingStrategyOutput } from "../domain/types.js";
+import type {
+  TestingStrategyOutput,
+  TradeoffAnalystOutput,
+} from "../domain/types.js";
 
 export type AgentOutputValidationStatus =
   | "passed"
@@ -104,6 +107,9 @@ function validateContractClaims(
   value: unknown,
 ): AgentOutputValidationReportError[] {
   if (contract !== "testing-strategy-output") {
+    if (contract === "tradeoff-analyst-output") {
+      return validateTradeoffAnalystClaims(contract, value);
+    }
     return [];
   }
 
@@ -125,6 +131,35 @@ function validateContractClaims(
       keyword: "commandEvidence",
       message: `Testing Strategy output claims ${gate.command} passed without passed command evidence`,
     }));
+}
+
+function validateTradeoffAnalystClaims(
+  contract: AgentOutputContract,
+  value: unknown,
+): AgentOutputValidationReportError[] {
+  const output = value as TradeoffAnalystOutput;
+  const criticalTradeoffCount =
+    output.weakDecisions.length +
+    output.overengineeringRisks.length +
+    output.underengineeringRisks.length +
+    output.hiddenAssumptions.length +
+    output.agentSafetyRisks.length +
+    output.adaptationWarnings.length;
+
+  if (criticalTradeoffCount > 0) {
+    return [];
+  }
+
+  return [
+    {
+      type: "schema-violation",
+      contract,
+      path: "/",
+      keyword: "tradeoffCoverage",
+      message:
+        "Tradeoff Analyst output must not only praise the repository; include evidence-backed weak decisions, risks, assumptions, safety risks, or adaptation warnings.",
+    },
+  ];
 }
 
 function parseJsonOutput(

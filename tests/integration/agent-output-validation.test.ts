@@ -169,6 +169,64 @@ test("agent output validator rejects Testing Strategy passed gates without passe
   assert.match(reports.writes[0]?.content ?? "", /npm test/);
 });
 
+test("agent output validator rejects Tradeoff Analyst outputs with unsupported tradeoffs", async () => {
+  const reports = new InMemoryValidationReports();
+  const output = await readExampleObject("tradeoff-analyst-output");
+  output.weakDecisions = [
+    {
+      decision: "Unsupported tradeoff",
+      tradeoff: "This claim has no cited repository evidence.",
+      risk: "QA cannot verify it.",
+      evidence: [],
+      confidence: 0.7,
+    },
+  ];
+
+  const result = await validateAgentOutput({
+    workspace,
+    agent: getAgentContract("tradeoff_analyst"),
+    attempt: 1,
+    rawOutput: JSON.stringify(output),
+    validators: await createSchemaContractValidators(),
+    reports,
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.status, "schema-invalid");
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /evidence/,
+  );
+  assert.match(reports.writes[0]?.content ?? "", /schema-invalid/);
+});
+
+test("agent output validator rejects Tradeoff Analyst outputs that only praise decisions", async () => {
+  const reports = new InMemoryValidationReports();
+  const output = await readExampleObject("tradeoff-analyst-output");
+  output.weakDecisions = [];
+  output.overengineeringRisks = [];
+  output.underengineeringRisks = [];
+  output.hiddenAssumptions = [];
+  output.agentSafetyRisks = [];
+  output.adaptationWarnings = [];
+
+  const result = await validateAgentOutput({
+    workspace,
+    agent: getAgentContract("tradeoff_analyst"),
+    attempt: 1,
+    rawOutput: JSON.stringify(output),
+    validators: await createSchemaContractValidators(),
+    reports,
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.status, "schema-invalid");
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /must not only praise/,
+  );
+});
+
 test("filesystem validation report writer saves reports under the validation workspace folder", async () => {
   const root = await mkdtemp(join(tmpdir(), "inspector-validation-report-"));
   const filesystemWorkspace: RunWorkspace = {

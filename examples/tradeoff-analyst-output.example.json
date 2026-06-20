@@ -1,0 +1,128 @@
+{
+  "strongDecisions": [
+    {
+      "decision": "Keep orchestration behind application ports.",
+      "tradeoff": "This adds explicit interfaces before adapters exist, but keeps core workflow logic testable without Node APIs.",
+      "consequence": "Future filesystem and runner changes can be tested through ports.",
+      "evidence": [
+        {
+          "file": "docs/architecture.md",
+          "lineStart": 9,
+          "lineEnd": 18
+        }
+      ],
+      "confidence": 0.86
+    }
+  ],
+  "weakDecisions": [
+    {
+      "decision": "The early runtime flow remains linear.",
+      "tradeoff": "It is simpler to audit but delays full scheduler integration.",
+      "risk": "New agents can be forgotten if the linear flow is not updated.",
+      "evidence": [
+        {
+          "file": "docs/architecture.md",
+          "lineStart": 95,
+          "lineEnd": 112
+        }
+      ],
+      "confidence": 0.74
+    }
+  ],
+  "overengineeringRisks": [
+    {
+      "risk": "Adding contracts before runtime use can create maintenance overhead.",
+      "tradeoff": "Schema-first work improves validation, but unused contracts can drift.",
+      "consequence": "Prompt, schema, and orchestration updates must land together.",
+      "evidence": [
+        {
+          "file": "docs/agent-output-contracts.md",
+          "lineStart": 100,
+          "lineEnd": 110
+        }
+      ],
+      "confidence": 0.69
+    }
+  ],
+  "underengineeringRisks": [
+    {
+      "risk": "Unsupported tradeoffs could enter final artifacts without a dedicated contract.",
+      "tradeoff": "Generic findings are flexible but do not force decision categories.",
+      "consequence": "QA has less structure for rejecting weak adaptation advice.",
+      "evidence": [
+        {
+          "file": "schemas/finding.schema.json",
+          "lineStart": 1,
+          "lineEnd": 36
+        }
+      ],
+      "confidence": 0.76
+    }
+  ],
+  "hiddenAssumptions": [
+    {
+      "assumption": "Architecture and Pattern Miner output is sufficient input for tradeoff analysis.",
+      "whyItMatters": "The analyst may miss operational risks if Testing Strategy evidence is ignored.",
+      "evidence": [
+        {
+          "file": "docs/architecture.md",
+          "lineStart": 126,
+          "lineEnd": 151
+        }
+      ],
+      "confidence": 0.72
+    }
+  ],
+  "agentSafetyRisks": [
+    {
+      "risk": "Agents may convert adaptation advice into repo-specific claims.",
+      "tradeoff": "Reusable advice is valuable, but it must remain separate from observed repository facts.",
+      "consequence": "Downstream cards could overstate evidence if advice and findings are mixed.",
+      "evidence": [
+        {
+          "file": "docs/ai-assisted-workflow.md",
+          "lineStart": 27,
+          "lineEnd": 37
+        }
+      ],
+      "confidence": 0.78
+    }
+  ],
+  "adaptationWarnings": [
+    {
+      "warning": "Do not copy the linear runtime flow into projects that already have scheduler orchestration.",
+      "repoSpecificContext": "This repository documents the current runtime slice as linear while scheduler-driven orchestration is pending.",
+      "adaptationAdvice": "Adapt the evidence and QA gates, but use an existing scheduler when one is already wired.",
+      "evidence": [
+        {
+          "file": "docs/project-context.md",
+          "lineStart": 60,
+          "lineEnd": 83
+        }
+      ],
+      "confidence": 0.8
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-tradeoff-analyst-001",
+      "agent": "tradeoff_analyst",
+      "severity": "medium",
+      "claim": "The current linear runtime slice is auditable but creates a risk that newly registered agents are not executed unless orchestration is updated.",
+      "evidence": [
+        {
+          "file": "docs/architecture.md",
+          "lineStart": 95,
+          "lineEnd": 112
+        }
+      ],
+      "recommendation": "Keep agent registry, prompt templates, output schemas, and runtime orchestration changes together until scheduler-driven orchestration is wired.",
+      "confidence": 0.78,
+      "tags": ["tradeoff", "orchestration"],
+      "cardType": "warning",
+      "audience": "coding-agent",
+      "risks": "Registered agents can appear supported before they participate in QA-gated runs.",
+      "adaptationNotes": "In another repo, verify whether agent registration automatically affects orchestration before assuming a new agent runs."
+    }
+  ]
+}

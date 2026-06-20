@@ -9,6 +9,7 @@ import type {
   RunConfig,
   ScoutOutput,
   TestingStrategyOutput,
+  TradeoffAnalystOutput,
 } from "../domain/types.js";
 import type {
   AgentOutputArtifactWriter,
@@ -381,6 +382,61 @@ export async function runScoutArchitectureInspection(
     });
   }
 
+  const tradeoffAnalystSchemaResult = await runAgentWorkflowStep({
+    input,
+    workspace,
+    agentId: "tradeoff_analyst",
+    progressName: "Tradeoff Analyst",
+    repoIndexSummary,
+    memorySnapshot,
+    previousOutputs: {
+      scout: scoutOutput,
+      architecture: architectureOutput,
+      pattern_miner: patternMinerOutput,
+      flow_tracer: flowTracerOutput,
+      testing_strategy: testingStrategyOutput,
+    },
+  });
+
+  if (!tradeoffAnalystSchemaResult.valid) {
+    throw new InspectionRunFailedError(
+      `Tradeoff Analyst schema validation failed: ${tradeoffAnalystSchemaResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+  schemaReports.push({ agentId: "tradeoff_analyst", valid: true, errors: [] });
+
+  const tradeoffAnalystOutput =
+    tradeoffAnalystSchemaResult.value as TradeoffAnalystOutput;
+  agentOutputs.tradeoff_analyst = tradeoffAnalystOutput;
+
+  input.progress?.("Validating Tradeoff Analyst evidence");
+  const tradeoffAnalystEvidenceResult = await validateEvidenceForAgent({
+    agentId: "tradeoff_analyst",
+    workspace,
+    repositoryReader: input.repositoryReader,
+    entries,
+    findings: tradeoffAnalystEvidenceFindings(tradeoffAnalystOutput),
+    evidenceReports: input.evidenceReports,
+  });
+
+  if (!tradeoffAnalystEvidenceResult.valid) {
+    throw new InspectionRunFailedError(
+      `Tradeoff Analyst evidence validation failed: ${tradeoffAnalystEvidenceResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+  evidenceReports.push({ agentId: "tradeoff_analyst", valid: true, errors: [] });
+
+  for (const finding of tradeoffAnalystOutput.findings) {
+    candidateFindings.push(finding);
+    await appendSwarmFinding({
+      finding,
+      memory: runMemory,
+      validator: input.validators.finding,
+    });
+  }
+
   input.progress?.("Running QA verification");
   let qa = await verifyFindingsWithQa({
     candidateFindings,
@@ -487,7 +543,8 @@ async function runAgentWorkflowStep(input: {
     | "architecture"
     | "pattern_miner"
     | "flow_tracer"
-    | "testing_strategy";
+    | "testing_strategy"
+    | "tradeoff_analyst";
   progressName: string;
   repoIndexSummary: unknown;
   memorySnapshot: string;
@@ -594,7 +651,8 @@ async function routeQaRevisionRequests(input: {
     | "architecture"
     | "pattern_miner"
     | "flow_tracer"
-    | "testing_strategy",
+    | "testing_strategy"
+    | "tradeoff_analyst",
     RevisionRequest[]
   >();
 
@@ -604,7 +662,8 @@ async function routeQaRevisionRequests(input: {
       request.targetAgent === "architecture" ||
       request.targetAgent === "pattern_miner" ||
       request.targetAgent === "flow_tracer" ||
-      request.targetAgent === "testing_strategy"
+      request.targetAgent === "testing_strategy" ||
+      request.targetAgent === "tradeoff_analyst"
     ) {
       requestsByOwner.set(request.targetAgent, [
         ...(requestsByOwner.get(request.targetAgent) ?? []),
@@ -691,7 +750,8 @@ function displayNameForAgent(
     | "architecture"
     | "pattern_miner"
     | "flow_tracer"
-    | "testing_strategy",
+    | "testing_strategy"
+    | "tradeoff_analyst",
 ): string {
   if (agentId === "pattern_miner") {
     return "Pattern Miner";
@@ -701,6 +761,9 @@ function displayNameForAgent(
   }
   if (agentId === "testing_strategy") {
     return "Testing Strategy";
+  }
+  if (agentId === "tradeoff_analyst") {
+    return "Tradeoff Analyst";
   }
   return agentId[0]?.toUpperCase() + agentId.slice(1);
 }
@@ -744,7 +807,8 @@ function findingsForAgentOutput(
     | "architecture"
     | "pattern_miner"
     | "flow_tracer"
-    | "testing_strategy",
+    | "testing_strategy"
+    | "tradeoff_analyst",
   output: unknown,
 ): Finding[] {
   if (agentId === "scout") {
@@ -759,7 +823,10 @@ function findingsForAgentOutput(
   if (agentId === "flow_tracer") {
     return (output as FlowTracerOutput).findings;
   }
-  return (output as TestingStrategyOutput).findings;
+  if (agentId === "testing_strategy") {
+    return (output as TestingStrategyOutput).findings;
+  }
+  return (output as TradeoffAnalystOutput).findings;
 }
 
 function evidenceFindingsForAgentOutput(
@@ -768,7 +835,8 @@ function evidenceFindingsForAgentOutput(
     | "architecture"
     | "pattern_miner"
     | "flow_tracer"
-    | "testing_strategy",
+    | "testing_strategy"
+    | "tradeoff_analyst",
   output: unknown,
 ): Finding[] {
   if (agentId === "scout") {
@@ -783,7 +851,10 @@ function evidenceFindingsForAgentOutput(
   if (agentId === "flow_tracer") {
     return flowTracerEvidenceFindings(output as FlowTracerOutput);
   }
-  return testingStrategyEvidenceFindings(output as TestingStrategyOutput);
+  if (agentId === "testing_strategy") {
+    return testingStrategyEvidenceFindings(output as TestingStrategyOutput);
+  }
+  return tradeoffAnalystEvidenceFindings(output as TradeoffAnalystOutput);
 }
 
 function renderInitialMemorySnapshot(objective: string): string {
@@ -1047,6 +1118,82 @@ function testingStrategyNoteFinding(
     recommendation:
       "Use this testing-strategy observation only with its cited evidence.",
     confidence: 0.5,
+  };
+}
+
+function tradeoffAnalystEvidenceFindings(
+  output: TradeoffAnalystOutput,
+): Finding[] {
+  return [
+    ...output.strongDecisions.map((item, index) => ({
+      id: `finding-tradeoff-analyst-strong-decision-${index + 1}`,
+      agent: "tradeoff_analyst",
+      severity: "info" as const,
+      claim: `${item.decision}: ${item.tradeoff}`,
+      evidence: item.evidence,
+      recommendation: item.consequence,
+      confidence: item.confidence,
+    })),
+    ...output.weakDecisions.map((item, index) => ({
+      id: `finding-tradeoff-analyst-weak-decision-${index + 1}`,
+      agent: "tradeoff_analyst",
+      severity: "medium" as const,
+      claim: `${item.decision}: ${item.tradeoff}`,
+      evidence: item.evidence,
+      recommendation: item.risk,
+      confidence: item.confidence,
+    })),
+    ...output.overengineeringRisks.map((item, index) =>
+      tradeoffRiskFinding("overengineering", index, item),
+    ),
+    ...output.underengineeringRisks.map((item, index) =>
+      tradeoffRiskFinding("underengineering", index, item),
+    ),
+    ...output.hiddenAssumptions.map((item, index) => ({
+      id: `finding-tradeoff-analyst-hidden-assumption-${index + 1}`,
+      agent: "tradeoff_analyst",
+      severity: "medium" as const,
+      claim: item.assumption,
+      evidence: item.evidence,
+      recommendation: item.whyItMatters,
+      confidence: item.confidence,
+    })),
+    ...output.agentSafetyRisks.map((item, index) =>
+      tradeoffRiskFinding("agent-safety", index, item, "high"),
+    ),
+    ...output.adaptationWarnings.map((item, index) => ({
+      id: `finding-tradeoff-analyst-adaptation-warning-${index + 1}`,
+      agent: "tradeoff_analyst",
+      severity: "medium" as const,
+      claim: `${item.warning}: ${item.repoSpecificContext}`,
+      evidence: item.evidence,
+      recommendation: item.adaptationAdvice,
+      confidence: item.confidence,
+    })),
+    ...output.findings,
+  ];
+}
+
+function tradeoffRiskFinding(
+  kind: string,
+  index: number,
+  item: {
+    risk: string;
+    tradeoff: string;
+    consequence: string;
+    evidence: Evidence[];
+    confidence: number;
+  },
+  severity: Finding["severity"] = "medium",
+): Finding {
+  return {
+    id: `finding-tradeoff-analyst-${kind}-risk-${index + 1}`,
+    agent: "tradeoff_analyst",
+    severity,
+    claim: `${item.risk}: ${item.tradeoff}`,
+    evidence: item.evidence,
+    recommendation: item.consequence,
+    confidence: item.confidence,
   };
 }
 

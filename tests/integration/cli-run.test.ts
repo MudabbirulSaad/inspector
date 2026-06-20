@@ -316,6 +316,95 @@ const testingStrategyOutput = {
   findings: [testingStrategyFinding],
 };
 
+const tradeoffAnalystFinding = {
+  id: "finding-tradeoff-analyst-001",
+  agent: "tradeoff_analyst",
+  severity: "medium",
+  claim:
+    "The fixture keeps inspection outputs evidence-backed, but its README-only evidence limits adaptation confidence.",
+  evidence: [
+    {
+      file: "README.md",
+      lineStart: 1,
+      lineEnd: 2,
+    },
+  ],
+  recommendation:
+    "Separate repo-specific tradeoffs from adaptation advice until source-level evidence exists.",
+  confidence: 0.7,
+  tags: ["tradeoff", "adaptation"],
+  cardType: "warning",
+};
+
+const tradeoffAnalystOutput = {
+  strongDecisions: [
+    {
+      decision: "Require evidence-backed inspection outputs.",
+      tradeoff:
+        "This prevents unsupported claims while making sparse fixtures produce shallow conclusions.",
+      consequence: "Tradeoff analysis remains traceable but limited.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.75,
+    },
+  ],
+  weakDecisions: [
+    {
+      decision: "Use README-only evidence in the fixture.",
+      tradeoff: "The fixture stays small but does not prove source-level architecture.",
+      risk: "Adaptation guidance can overfit to shallow evidence.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.66,
+    },
+  ],
+  overengineeringRisks: [
+    {
+      risk: "Too many specialist outputs can add ceremony for tiny repositories.",
+      tradeoff: "Specialization improves review focus but adds orchestration overhead.",
+      consequence: "Small repositories may need explicit insufficient-evidence paths.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.64,
+    },
+  ],
+  underengineeringRisks: [
+    {
+      risk: "Generic findings do not separate repo tradeoffs from adaptation advice.",
+      tradeoff: "A flexible finding shape is easy to emit but weak for reuse.",
+      consequence: "Future agents may copy advice without checking context.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.72,
+    },
+  ],
+  hiddenAssumptions: [
+    {
+      assumption: "README context is enough to discuss workflow tradeoffs.",
+      whyItMatters: "The assumption must stay visible so agents do not infer unseen code.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.68,
+    },
+  ],
+  agentSafetyRisks: [
+    {
+      risk: "Agents may praise the repo without naming weak decisions.",
+      tradeoff: "Positive summaries are easy to reuse but hide failure modes.",
+      consequence: "QA should reject unsupported or praise-only tradeoff output.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.7,
+    },
+  ],
+  adaptationWarnings: [
+    {
+      warning: "Do not adapt README-only tradeoffs as source-level architecture advice.",
+      repoSpecificContext:
+        "The fixture only proves README-backed inspection context.",
+      adaptationAdvice:
+        "Require source file evidence before copying architecture tradeoffs elsewhere.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      confidence: 0.73,
+    },
+  ],
+  findings: [tradeoffAnalystFinding],
+};
+
 function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunResult {
   return {
     stdout,
@@ -384,6 +473,20 @@ function successfulTestingStrategyResult(
   };
 }
 
+function successfulTradeoffAnalystResult(
+  stdout = JSON.stringify(tradeoffAnalystOutput),
+): AgentRunResult {
+  return {
+    stdout,
+    stderr: "",
+    exitCode: 0,
+    startedAt: "2026-06-20T01:02:14.000Z",
+    completedAt: "2026-06-20T01:02:15.000Z",
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+}
+
 function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
   return new FakeAgentRunner({
     results: [
@@ -392,6 +495,7 @@ function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
       successfulPatternMinerResult(),
       successfulFlowTracerResult(),
       successfulTestingStrategyResult(),
+      successfulTradeoffAnalystResult(),
       ...results,
     ],
   });
@@ -554,7 +658,7 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
   });
 
   assert.equal(result.exitCode, 0);
-  assert.equal(runner.requests.length, 5);
+  assert.equal(runner.requests.length, 6);
   assert.equal(runner.requests[0]?.agentId, "scout");
   assert.match(runner.requests[0]?.prompt ?? "", /Inspect the repository/);
   assert.deepEqual(
@@ -719,6 +823,36 @@ test("CLI run sends Testing Strategy a prompt containing prior specialist output
   assert.match(prompt, /commandEvidence/);
 });
 
+test("CLI run sends Tradeoff Analyst a prompt containing prior risk and pattern outputs", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(runner.requests[5]?.agentId, "tradeoff_analyst");
+  const prompt = runner.requests[5]?.prompt ?? "";
+  assert.match(prompt, /# Agent Prompt: tradeoff_analyst/);
+  assert.match(prompt, /Previous Outputs/);
+  assert.match(prompt, /architectureRisks/);
+  assert.match(prompt, /patterns/);
+  assert.match(prompt, /testingRisks/);
+  assert.match(prompt, /Tradeoff Analyst Agent Output Rules/);
+  assert.match(prompt, /adaptationWarnings/);
+});
+
 test("CLI run writes repository, memory, schema, and evidence artifacts", async () => {
   const fixture = await createFixture();
 
@@ -761,6 +895,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       patternMinerFinding,
       flowTracerFinding,
       testingStrategyFinding,
+      tradeoffAnalystFinding,
     ],
   );
   assert.deepEqual(
@@ -774,6 +909,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       patternMinerFinding,
       flowTracerFinding,
       testingStrategyFinding,
+      tradeoffAnalystFinding,
     ],
   );
   assert.match(
@@ -924,6 +1060,47 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
     ),
     /"valid": true/,
   );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(
+          workspaceRoot,
+          "agents",
+          "tradeoff_analyst",
+          "attempt-1",
+          "output.json",
+        ),
+        "utf8",
+      ),
+    ),
+    tradeoffAnalystOutput,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "tradeoff_analyst",
+        "attempt-1",
+        "report.json",
+      ),
+      "utf8",
+    ),
+    /"contract": "tradeoff-analyst-output"/,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "tradeoff_analyst",
+        "attempt-1",
+        "evidence.json",
+      ),
+      "utf8",
+    ),
+    /"valid": true/,
+  );
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
       .readinessScore,
@@ -932,7 +1109,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "results.json"), "utf8"))
       .length,
-    5,
+    6,
   );
   assert.match(
     await readFile(
@@ -946,7 +1123,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       join(workspaceRoot, "final", "docs", "09-verification-report.md"),
       "utf8",
     ),
-    /Approved findings used: 5/,
+    /Approved findings used: 6/,
   );
   assert.match(
     await readFile(
@@ -1023,6 +1200,7 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
       successfulPatternMinerResult(),
       successfulFlowTracerResult(),
       successfulTestingStrategyResult(),
+      successfulTradeoffAnalystResult(),
       successfulArchitectureResult(JSON.stringify(repairedArchitectureOutput)),
     ],
   });
@@ -1050,6 +1228,7 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
       ["pattern_miner", 1],
       ["flow_tracer", 1],
       ["testing_strategy", 1],
+      ["tradeoff_analyst", 1],
       ["architecture", 2],
     ],
   );
@@ -1139,6 +1318,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
       successfulPatternMinerResult(),
       successfulFlowTracerResult(),
       successfulTestingStrategyResult(),
+      successfulTradeoffAnalystResult(),
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
     ],
   });
@@ -1166,6 +1346,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
       ["pattern_miner", 1],
       ["flow_tracer", 1],
       ["testing_strategy", 1],
+      ["tradeoff_analyst", 1],
       ["architecture", 2],
     ],
   );
@@ -1190,7 +1371,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
       .readinessScore,
-    67,
+    71,
   );
   assert.match(
     await readFile(join(workspaceRoot, "memory", "qa_issues.jsonl"), "utf8"),
@@ -1220,6 +1401,7 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
         successfulPatternMinerResult(JSON.stringify(patternMinerOutput)),
         successfulFlowTracerResult(JSON.stringify(flowTracerOutput)),
         successfulTestingStrategyResult(JSON.stringify(testingStrategyOutput)),
+        successfulTradeoffAnalystResult(JSON.stringify(tradeoffAnalystOutput)),
       ].map((agentResult) => ({
         ...agentResult,
         streamingEvents: [
@@ -1246,6 +1428,8 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.match(stdout.join("\n"), /\[flow_tracer:status\] Scout started/);
   assert.match(stdout.join("\n"), /Running Testing Strategy/);
   assert.match(stdout.join("\n"), /\[testing_strategy:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Running Tradeoff Analyst/);
+  assert.match(stdout.join("\n"), /\[tradeoff_analyst:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
 });
 
