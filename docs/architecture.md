@@ -127,6 +127,15 @@ Adapter responsibilities include:
   routing live in focused application modules so the high-level runtime
   orchestrator remains the coordination layer. It remains a linear early
   runtime slice until the full scheduler-driven orchestration flow is wired.
+- The CLI `status` adapter reads an existing run directory and summarizes the
+  six implemented specialist stages as completed, failed, running, or pending
+  from `agents/<agent-id>/attempt-<n>/status.json`.
+- The CLI `resume` adapter reconstructs an existing workspace from
+  `config.json`, memory, repository index, command report, agent status, and
+  output artifacts, then calls a resume-aware application use case. The use case
+  reuses completed specialist outputs, starts at failed or pending stages, and
+  fails safely when state is ambiguous rather than rerunning an approved stage
+  or inventing missing prior output.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a

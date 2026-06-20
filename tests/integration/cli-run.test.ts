@@ -614,6 +614,161 @@ test("CLI run creates a run workspace for a valid command", async () => {
   );
 });
 
+test("CLI status summarizes completed, failed, running, and pending stages", async () => {
+  const fixture = await createFixture();
+  const runDirectory = join(fixture.outPath, "existing-run");
+  await mkdir(join(runDirectory, "agents", "scout", "attempt-1"), {
+    recursive: true,
+  });
+  await mkdir(join(runDirectory, "agents", "architecture", "attempt-1"), {
+    recursive: true,
+  });
+  await mkdir(join(runDirectory, "agents", "pattern_miner", "attempt-1"), {
+    recursive: true,
+  });
+  await writeFile(
+    join(runDirectory, "agents", "scout", "attempt-1", "status.json"),
+    `${JSON.stringify({ agentId: "scout", status: "APPROVED", attempts: 1 })}\n`,
+  );
+  await writeFile(
+    join(runDirectory, "agents", "architecture", "attempt-1", "status.json"),
+    `${JSON.stringify({ agentId: "architecture", status: "FAILED", attempts: 1 })}\n`,
+  );
+  await writeFile(
+    join(runDirectory, "agents", "pattern_miner", "attempt-1", "status.json"),
+    `${JSON.stringify({ agentId: "pattern_miner", status: "RUNNING", attempts: 1 })}\n`,
+  );
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: ["status", runDirectory],
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(stdout.join("\n"), /Completed: 1/);
+  assert.match(stdout.join("\n"), /Failed: 1/);
+  assert.match(stdout.join("\n"), /Running: 1/);
+  assert.match(stdout.join("\n"), /Pending: 3/);
+});
+
+test("CLI resume continues an incomplete run without rerunning completed agents", async () => {
+  const fixture = await createFixture();
+  const initialRunner = new FakeAgentRunner({
+    results: [successfulScoutResult(), successfulArchitectureResult("{}")],
+  });
+
+  const initial = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: initialRunner,
+    stdout: () => undefined,
+    stderr: () => undefined,
+  });
+
+  assert.equal(initial.exitCode, 1);
+  assert.equal(initial.workspace?.root !== undefined, true);
+
+  const resumeRunner = new FakeAgentRunner({
+    results: [
+      successfulArchitectureResult(),
+      successfulPatternMinerResult(),
+      successfulFlowTracerResult(),
+      successfulTestingStrategyResult(),
+      successfulTradeoffAnalystResult(),
+    ],
+  });
+  const stdout: string[] = [];
+  const resumed = await runInspectorCli({
+    argv: ["resume", initial.workspace?.root ?? ""],
+    clock: fixedClock,
+    runner: resumeRunner,
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(resumed.exitCode, 0);
+  assert.deepEqual(
+    resumeRunner.requests.map((request) => request.agentId),
+    [
+      "architecture",
+      "pattern_miner",
+      "flow_tracer",
+      "testing_strategy",
+      "tradeoff_analyst",
+    ],
+  );
+  assert.match(stdout.join("\n"), /Inspection run workspace:/);
+  assert.equal(
+    await stat(
+      join(
+        initial.workspace?.root ?? "",
+        "final",
+        "docs",
+        "00-executive-summary.md",
+      ),
+    ).then((metadata) => metadata.isFile()),
+    true,
+  );
+});
+
+test("CLI resume fails safely when completed agent state is missing output", async () => {
+  const fixture = await createFixture();
+  const runDirectory = join(fixture.outPath, "corrupted-run");
+  await mkdir(join(runDirectory, "repo_index"), { recursive: true });
+  await mkdir(join(runDirectory, "memory"), { recursive: true });
+  await mkdir(join(runDirectory, "validation"), { recursive: true });
+  await mkdir(join(runDirectory, "agents", "scout", "attempt-1"), {
+    recursive: true,
+  });
+  await writeFile(
+    join(runDirectory, "config.json"),
+    `${JSON.stringify({
+      target: { name: "target-repo", root: fixture.repoPath },
+      outputDirectory: fixture.outPath,
+      agentRoles: ["documentation"],
+      validationCommands: [],
+      runQualityCommands: false,
+    })}\n`,
+  );
+  await writeFile(join(runDirectory, "memory", "blackboard.md"), "Objective: Inspect safely.\n");
+  await writeFile(join(runDirectory, "repo_index", "repo_summary.json"), "{}\n");
+  await writeFile(join(runDirectory, "repo_index", "important_files.json"), "[]\n");
+  await writeFile(join(runDirectory, "repo_index", "detected_stack.json"), "{}\n");
+  await writeFile(join(runDirectory, "repo_index", "detected_commands.json"), "{}\n");
+  await writeFile(join(runDirectory, "repo_index", "file_tree.txt"), ".\nREADME.md\n");
+  await writeFile(
+    join(runDirectory, "validation", "command_report.json"),
+    `${JSON.stringify({ skipped: true, reason: "disabled", commands: [] })}\n`,
+  );
+  await writeFile(
+    join(runDirectory, "agents", "scout", "attempt-1", "status.json"),
+    `${JSON.stringify({ agentId: "scout", status: "APPROVED", attempts: 1 })}\n`,
+  );
+  const stderr: string[] = [];
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: ["resume", runDirectory],
+    runner,
+    stdout: () => undefined,
+    stderr: (line) => stderr.push(line),
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /Ambiguous run state: completed scout is missing output/,
+  );
+  assert.equal(runner.requests.length, 0);
+});
+
 test("CLI run writes a skipped command report by default without invoking the process runner", async () => {
   const fixture = await createFixture();
   const processRunner = new RecordingProcessRunner();

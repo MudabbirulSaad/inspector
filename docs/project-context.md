@@ -120,7 +120,14 @@ records source repository plus confidence metadata. Fast end-to-end fixture
 tests now run the full fake-run pipeline against `tests/fixtures/tiny-node-app`
 and `tests/fixtures/tiny-layered-app`, verifying workspace, indexing, agent
 order, memory, validation, QA approval, final docs, and RAG-card artifacts
-without network calls or a real Codex dependency. Full scheduler-driven
+without network calls or a real Codex dependency. The CLI now supports
+`inspector status <run-dir>` for summarizing completed, failed, running, and
+pending specialist stages from lifecycle artifacts, plus
+`inspector resume <run-dir>` for safely continuing incomplete runs from the
+existing workspace. Resume reuses completed specialist outputs, does not rerun
+approved or completed agents, retries failed or pending stages in place, and
+fails when run state is ambiguous, such as a completed stage missing its output.
+Full scheduler-driven
 multi-agent orchestration is still pending.
 
 ## Non-Goals

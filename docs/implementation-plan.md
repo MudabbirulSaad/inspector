@@ -1540,3 +1540,45 @@ git status
 ```bash
 test(e2e): verify fake-run inspection pipeline
 ```
+
+### Milestone 34: Run Status and Safe Resume
+
+#### Goal
+
+Add status and resume commands for existing inspection run directories.
+
+#### Tasks
+
+- Added `inspector status <run-dir>` to summarize the implemented specialist
+  stages as completed, failed, running, and pending from lifecycle status
+  artifacts.
+- Added `inspector resume <run-dir>` to reconstruct an existing workspace from
+  `config.json`, memory, repository index, command report, status, and output
+  artifacts.
+- Added a resume-aware application use case that reuses completed specialist
+  outputs, starts from failed or pending stages, preserves attempt numbering,
+  reruns QA, and rewrites final docs and RAG cards in the same workspace.
+- Made ambiguous resume state fail safely, including completed stages that are
+  missing required output artifacts.
+
+#### TDD
+
+Added CLI integration tests one behavior at a time for status summary counts,
+resuming an incomplete run, skipping completed agents during resume, and
+corrupted completed-agent state failure.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(runs): add status and safe resume
+```

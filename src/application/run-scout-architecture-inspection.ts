@@ -652,7 +652,7 @@ const implementedSpecialistSequence = [
   "tradeoff_analyst",
 ] as const;
 
-function validateRuntimeConfig(config: RunConfig): void {
+export function validateRuntimeConfig(config: RunConfig): void {
   if (config.parallelism !== undefined && config.parallelism > 1) {
     throw new Error(
       "parallelism > 1 is reserved for scheduler-driven orchestration and is not active before Milestone 34+",
@@ -675,7 +675,7 @@ function validateRuntimeConfig(config: RunConfig): void {
   }
 }
 
-async function validateEvidenceForAgent(input: {
+export async function validateEvidenceForAgent(input: {
   agentId: string;
   workspace: RunWorkspace;
   repositoryReader: RepositoryReader;

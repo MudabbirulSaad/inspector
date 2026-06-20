@@ -1,10 +1,14 @@
-import { readFile, stat } from "node:fs/promises";
-import { basename, dirname, isAbsolute, resolve } from "node:path";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   InspectionRunFailedError,
+  resumeScoutArchitectureInspection,
   runScoutArchitectureInspection,
+  type QualityCommandReport,
+  type ResumeSpecialistState,
+  type RuntimeSpecialistAgentId,
 } from "../../application/index.js";
 import type { RunConfig } from "../../domain/types.js";
 import type {
@@ -104,6 +108,16 @@ export async function runInspectorCli(
 
   let debug = request.argv.includes("--debug");
   try {
+    if (request.argv[0] === "status") {
+      await printRunStatus(request.argv, stdout);
+      return { exitCode: 0 };
+    }
+    if (request.argv[0] === "resume") {
+      const result = await resumeRunCommand(request, stdout);
+      stdout(`Inspection run workspace: ${result.workspace.root}`);
+      return { exitCode: 0, workspace: result.workspace };
+    }
+
     const command = await parseRunCommand(request.argv);
     debug = command.debug;
     await assertDirectory(command.repoPath, "Repository path");
@@ -182,6 +196,290 @@ export async function runInspectorCli(
       workspace:
         error instanceof InspectionRunFailedError ? error.workspace : undefined,
     };
+  }
+}
+
+const runtimeStageIds = [
+  "scout",
+  "architecture",
+  "pattern_miner",
+  "flow_tracer",
+  "testing_strategy",
+  "tradeoff_analyst",
+] as const;
+
+type RuntimeStageStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "OUTPUT_RECEIVED"
+  | "SCHEMA_VALIDATED"
+  | "EVIDENCE_VALIDATED"
+  | "QA_REVIEWED"
+  | "APPROVED"
+  | "SCHEMA_FAILED"
+  | "EVIDENCE_FAILED"
+  | "QA_FAILED"
+  | "RETRYING"
+  | "FAILED";
+
+async function printRunStatus(
+  argv: string[],
+  stdout: (line: string) => void,
+): Promise<void> {
+  const runDirectory = argv[1];
+  if (runDirectory === undefined || runDirectory.startsWith("--")) {
+    throw new Error("Usage: inspector status <run-dir>");
+  }
+
+  await assertDirectory(runDirectory, "Run directory");
+  const statuses = await readRunStageStatuses(runDirectory);
+  const completed = statuses.filter((status) => isCompletedStatus(status)).length;
+  const failed = statuses.filter((status) => isFailedStatus(status)).length;
+  const running = statuses.filter((status) => status === "RUNNING").length;
+  const pending = statuses.filter((status) => status === "PENDING").length;
+
+  stdout(`Run status: ${resolve(runDirectory)}`);
+  stdout(`Completed: ${completed}`);
+  stdout(`Failed: ${failed}`);
+  stdout(`Running: ${running}`);
+  stdout(`Pending: ${pending}`);
+}
+
+async function resumeRunCommand(
+  request: InspectorCliRequest,
+  stdout: (line: string) => void,
+): Promise<InspectorCliResult & { workspace: RunWorkspace }> {
+  const runDirectory = request.argv[1];
+  if (runDirectory === undefined || runDirectory.startsWith("--")) {
+    throw new Error("Usage: inspector resume <run-dir>");
+  }
+
+  await assertDirectory(runDirectory, "Run directory");
+  const workspace = toExistingRunWorkspace(resolve(runDirectory));
+  const config = await readRunConfig(workspace.configFile);
+  const objective = await readRunObjective(workspace);
+  const repositoryReader = new NodeRepositoryReader(config.target.root);
+  const repositoryEntries = await repositoryReader.listEntries();
+  const commandReport = await readQualityCommandReport(workspace);
+  const processRunner = request.processRunner ?? new NodeProcessRunner();
+
+  printProgress(stdout, config.verbose === true, `Resuming inspection: ${config.target.name}`);
+  const result = await resumeScoutArchitectureInspection({
+    config,
+    objective,
+    workspace,
+    commandReport,
+    stages: await readRunStageState(workspace.root),
+    clock: request.clock ?? systemClock,
+    runner:
+      request.runner ??
+      (await createRunnerFromConfig(config.runner, repositoryReader, repositoryEntries)),
+    workspaces: new NodeRunWorkspaceStore(),
+    repositoryReader,
+    repositoryIndexWriter: new NodeRepositoryIndexWriter(),
+    repositoryIndexContext: new NodeRepositoryIndexPromptContextReader(),
+    memory: (runWorkspace) => new NodeSwarmMemoryStore(runWorkspace),
+    promptTemplates: new NodePromptTemplateReader(promptRoot),
+    promptArtifacts: new NodePromptArtifactWriter(),
+    statusArtifacts: new NodeAgentStatusArtifactWriter(),
+    outputArtifacts: new NodeAgentOutputArtifactWriter(),
+    validationReports: new NodeValidationReportWriter(),
+    evidenceReports: new NodeEvidenceValidationReportWriter(),
+    qaArtifacts: new NodeQaArtifactWriter(),
+    qualityCommandReports: new NodeQualityCommandReportWriter(),
+    finalDocs: new NodeCaseStudyDocumentWriter(),
+    ragCards: new NodeRagKnowledgeCardWriter(),
+    processRunner,
+    validators: await createSchemaContractValidators(),
+    schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
+    progress: (message) => printProgress(stdout, config.verbose === true, message),
+    stream: (agentId, kind, message) => {
+      if (config.verbose === true) {
+        stdout(`[${agentId}:${kind}] ${message}`);
+      }
+    },
+  });
+  return { exitCode: 0, workspace: result.workspace };
+}
+
+function toExistingRunWorkspace(root: string): RunWorkspace {
+  return {
+    name: basename(root),
+    root,
+    configFile: join(root, "config.json"),
+    folders: {
+      input: join(root, "input"),
+      repoIndex: join(root, "repo_index"),
+      memory: join(root, "memory"),
+      agents: join(root, "agents"),
+      validation: join(root, "validation"),
+      qa: join(root, "qa"),
+      final: join(root, "final"),
+    },
+  };
+}
+
+async function readRunConfig(path: string): Promise<RunConfig> {
+  const value = JSON.parse(await readFile(path, "utf8")) as RunConfig;
+  if (
+    !isRecord(value) ||
+    !isRecord(value.target) ||
+    typeof value.target.name !== "string" ||
+    typeof value.target.root !== "string" ||
+    typeof value.outputDirectory !== "string"
+  ) {
+    throw new Error("Corrupted run state: invalid config.json");
+  }
+  return value;
+}
+
+async function readRunObjective(workspace: RunWorkspace): Promise<string> {
+  const blackboard = await readFile(
+    join(workspace.folders.memory, "blackboard.md"),
+    "utf8",
+  );
+  const match = /^Objective: (?<objective>.+)$/m.exec(blackboard);
+  const objective = match?.groups?.objective;
+  if (objective === undefined || objective.trim().length === 0) {
+    throw new Error("Ambiguous run state: missing original objective");
+  }
+  return `${objective.trim()}\n`;
+}
+
+async function readQualityCommandReport(
+  workspace: RunWorkspace,
+): Promise<QualityCommandReport> {
+  return JSON.parse(
+    await readFile(
+      join(workspace.folders.validation, "command_report.json"),
+      "utf8",
+    ),
+  ) as QualityCommandReport;
+}
+
+async function readRunStageStatuses(
+  runDirectory: string,
+): Promise<RuntimeStageStatus[]> {
+  return Promise.all(
+    runtimeStageIds.map(async (agentId) => {
+      const status = await readLatestAgentStatus(runDirectory, agentId);
+      return status ?? "PENDING";
+    }),
+  );
+}
+
+async function readRunStageState(
+  runDirectory: string,
+): Promise<ResumeSpecialistState[]> {
+  return Promise.all(
+    runtimeStageIds.map(async (agentId) => {
+      const latest = await readLatestAgentStatusSnapshot(runDirectory, agentId);
+      if (latest === undefined) {
+        return { agentId, status: "PENDING", attempt: 0 };
+      }
+      return {
+        agentId,
+        status: latest.status,
+        attempt: latest.attempt,
+        ...(latest.output === undefined ? {} : { output: latest.output }),
+      };
+    }),
+  );
+}
+
+async function readLatestAgentStatus(
+  runDirectory: string,
+  agentId: RuntimeSpecialistAgentId,
+): Promise<RuntimeStageStatus | undefined> {
+  return (await readLatestAgentStatusSnapshot(runDirectory, agentId))?.status;
+}
+
+async function readLatestAgentStatusSnapshot(
+  runDirectory: string,
+  agentId: RuntimeSpecialistAgentId,
+): Promise<
+  | {
+      status: RuntimeStageStatus;
+      attempt: number;
+      output?: unknown;
+    }
+  | undefined
+> {
+  const agentDirectory = join(runDirectory, "agents", agentId);
+  let entries: string[];
+  try {
+    entries = await readdir(agentDirectory);
+  } catch {
+    return undefined;
+  }
+
+  const attempts = entries
+    .map((entry) => /^attempt-(\d+)$/.exec(entry)?.[1])
+    .filter((attempt): attempt is string => attempt !== undefined)
+    .map(Number)
+    .sort((left, right) => right - left);
+  const latestAttempt = attempts[0];
+  if (latestAttempt === undefined) {
+    return undefined;
+  }
+
+  const statusJson = JSON.parse(
+    await readFile(
+      join(agentDirectory, `attempt-${latestAttempt}`, "status.json"),
+      "utf8",
+    ),
+  ) as { status?: unknown };
+
+  if (!isRuntimeStageStatus(statusJson.status)) {
+    throw new Error(`Corrupted run state: invalid status for ${agentId}`);
+  }
+
+  const output = await readOptionalJson(
+    join(agentDirectory, `attempt-${latestAttempt}`, "output.json"),
+  );
+
+  return {
+    status: statusJson.status,
+    attempt: latestAttempt,
+    ...(output === undefined ? {} : { output }),
+  };
+}
+
+function isRuntimeStageStatus(value: unknown): value is RuntimeStageStatus {
+  return (
+    typeof value === "string" &&
+    [
+      "PENDING",
+      "RUNNING",
+      "OUTPUT_RECEIVED",
+      "SCHEMA_VALIDATED",
+      "EVIDENCE_VALIDATED",
+      "QA_REVIEWED",
+      "APPROVED",
+      "SCHEMA_FAILED",
+      "EVIDENCE_FAILED",
+      "QA_FAILED",
+      "RETRYING",
+      "FAILED",
+    ].includes(value)
+  );
+}
+
+function isCompletedStatus(status: RuntimeStageStatus): boolean {
+  return ["EVIDENCE_VALIDATED", "QA_REVIEWED", "APPROVED"].includes(status);
+}
+
+function isFailedStatus(status: RuntimeStageStatus): boolean {
+  return ["SCHEMA_FAILED", "EVIDENCE_FAILED", "QA_FAILED", "FAILED"].includes(
+    status,
+  );
+}
+
+async function readOptionalJson(path: string): Promise<unknown | undefined> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as unknown;
+  } catch {
+    return undefined;
   }
 }
 
