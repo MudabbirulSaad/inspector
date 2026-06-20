@@ -27,10 +27,12 @@ contract-first baseline:
 - Package scripts for tests, type checking, build, and aggregate validation.
 
 Runtime CLI implementation has not started. The current source tree does not
-contain CLI argument parsing, orchestration services, process adapters, Codex
-runner adapters, memory stores, or final writer adapters. Filesystem adapters
-now exist for auditable run workspace creation and deterministic repository
-indexing.
+contain CLI argument parsing, full orchestration services, real process
+execution, real Codex execution, or final writer adapters. Filesystem adapters
+now exist for auditable run workspace creation, deterministic repository
+indexing, append-only run memory, prompt template loading, and prompt artifact
+writing. Runner ports now exist with a fake agent runner and process-runner
+placeholder for deterministic orchestration tests.
 
 ## Fixed Milestones
 
@@ -514,4 +516,45 @@ git status
 
 ```bash
 feat(prompts): build auditable agent prompts from templates
+```
+
+### Milestone 12: Agent Runner Port and Fake Adapter
+
+#### Goal
+
+Abstract Codex execution behind a port.
+
+#### Tasks
+
+- Added an `AgentRunner` port with structured run requests and results.
+- Defined runner results with stdout, stderr, exit code, start and completion
+  timestamps, output artifact paths, streaming events, and optional failure
+  reasons.
+- Added a fake agent runner adapter for deterministic success, failure, and
+  streaming-event tests.
+- Added an application execution helper that depends on the runner port instead
+  of a Codex adapter.
+- Added a `ProcessRunner` port and placeholder process adapter for future local
+  command execution.
+
+#### TDD
+
+Added runner tests one behavior at a time for fake success, fake failure,
+streaming event capture, application dependency on the runner port, and the
+process runner placeholder.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(codex): introduce agent runner port and fake adapter
 ```

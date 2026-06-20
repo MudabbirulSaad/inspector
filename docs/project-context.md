@@ -38,7 +38,10 @@ findings, and blackboard snapshots, plus a fixed agent registry for V1 and later
 inspection agent contracts. It now has auditable prompt templates for required
 V1 agents, plus application and filesystem ports that build exact agent prompts
 from run context and save those prompts under the run workspace. Runtime CLI
-behavior is still pending.
+behavior is still pending. Agent execution is now abstracted behind an
+`AgentRunner` port with a deterministic fake adapter for success, failure, and
+streaming-event tests; real Codex execution and real process execution remain
+pending adapter work.
 
 ## Non-Goals
 

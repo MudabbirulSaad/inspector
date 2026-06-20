@@ -84,3 +84,59 @@ export interface PromptArtifactWriter {
     content: string;
   }): Promise<{ path: string }>;
 }
+
+export type AgentRunnerStreamEventKind =
+  | "stdout"
+  | "stderr"
+  | "status"
+  | "artifact";
+
+export interface AgentRunnerStreamEvent {
+  timestamp: string;
+  kind: AgentRunnerStreamEventKind;
+  message: string;
+  artifactPath?: string;
+}
+
+export interface AgentRunRequest {
+  agentId: string;
+  attempt: number;
+  prompt: string;
+  workspaceRoot: string;
+  onStreamingEvent?: (event: AgentRunnerStreamEvent) => void | Promise<void>;
+}
+
+export interface AgentRunResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  startedAt: string;
+  completedAt: string;
+  outputArtifactPaths: string[];
+  streamingEvents: AgentRunnerStreamEvent[];
+  failureReason?: string;
+}
+
+export interface AgentRunner {
+  runAgent(request: AgentRunRequest): Promise<AgentRunResult>;
+}
+
+export interface ProcessRunRequest {
+  command: string;
+  args: string[];
+  cwd: string;
+  env?: Record<string, string>;
+}
+
+export interface ProcessRunResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  startedAt: string;
+  completedAt: string;
+  failureReason?: string;
+}
+
+export interface ProcessRunner {
+  run(request: ProcessRunRequest): Promise<ProcessRunResult>;
+}

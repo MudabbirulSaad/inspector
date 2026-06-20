@@ -101,8 +101,10 @@ Adapter responsibilities include:
   and write approved `repo_index/` artifacts without leaking Node filesystem
   APIs into the core.
 - Process adapters run local commands behind deterministic ports.
-- Codex runner adapters invoke external AI workers and return structured raw
-  outputs for validation.
+- Agent runner adapters invoke external AI workers and return structured raw
+  outputs, streaming events, artifact paths, timestamps, exit codes, and failure
+  reasons for validation. The current fake agent runner is deterministic for
+  tests; real Codex invocation remains an adapter concern.
 - Memory adapters persist local swarm events without exposing raw prompts,
   transcripts, secrets, or private state in public docs. Run memory is
   append-only and lives under the run workspace `memory/` folder.
@@ -121,7 +123,7 @@ Expected ports include:
 - `RepositoryIndexer` for producing repository inventory from reader data.
 - `RepositoryIndexWriter` for writing deterministic repository index artifacts.
 - `ProcessRunner` for local command execution.
-- `AgentRunner` or `CodexRunner` for external worker invocation.
+- `AgentRunner` for external worker invocation.
 - `Clock` for timestamps.
 - `RunWorkspaceStore` for creating auditable inspection run workspaces.
 - `Logger` for user-visible and diagnostic messages.
