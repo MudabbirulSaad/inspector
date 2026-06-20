@@ -1368,3 +1368,47 @@ git status
 ```bash
 feat(cli): stream professional inspection progress
 ```
+
+### Milestone 30: Config File Support
+
+#### Goal
+
+Support declarative inspection config files.
+
+#### Tasks
+
+- Added `inspector run inspection.yaml` alongside existing direct CLI usage.
+- Added a focused YAML config parser for supported inspection fields:
+  `repoPath`, `outputPath`, `objective`, `targetContext`, `agents`,
+  `parallelism`, `maxRetries`, `verbose`, and `runner`.
+- Resolved relative `repoPath` and `outputPath` values from the config file
+  directory.
+- Allowed existing CLI flags such as `--objective`, `--out`, and `--verbose`
+  to override config values where reasonable.
+- Preserved declarative config values in the run workspace `config.json`.
+- Appended `targetContext` to the objective passed to agent prompts.
+- Wired `maxRetries` into QA owner-revision routing.
+- Supported fake runner config and process-backed runner config with explicit
+  command, args, timeout, and environment values.
+- Kept existing direct CLI usage working.
+
+#### TDD
+
+Added CLI integration tests for valid config files, invalid config values, CLI
+overrides, missing required config values, and config-driven retry limits.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(config): support declarative inspection runs
+```

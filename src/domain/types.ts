@@ -369,6 +369,17 @@ export interface RunConfig {
   agentRoles: AgentRole[];
   validationCommands: string[];
   verbose: boolean;
+  targetContext?: string;
+  agents?: string[];
+  parallelism?: number;
+  maxRetries?: number;
+  runner?: {
+    provider: string;
+    command?: string;
+    args?: string[];
+    timeoutMs?: number;
+    env?: Record<string, string>;
+  };
 }
 
 export interface ValidationCommand {

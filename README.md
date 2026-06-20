@@ -4,15 +4,23 @@
 
 The current runtime slice supports Scout, Architecture, Pattern Miner, Flow Tracer, Testing Strategy, Tradeoff Analyst, deterministic QA verification, final case-study docs, and RAG knowledge cards. It creates a run workspace, indexes a repository, initializes memory, builds audited prompts from repository index context and prior specialist outputs, validates each agent's structured output and evidence, appends candidate findings to memory, and then separates approved and rejected findings with QA results, QA issues, revision requests, and a readiness score.
 
-The current standalone CLI runtime uses a deterministic fake runner by default. Real process-backed runner infrastructure exists, but CLI configuration for real Codex execution is not exposed yet.
+The current standalone CLI runtime uses a deterministic fake runner by default.
+Declarative config files can select the fake runner or a process-backed runner
+with an explicit local command.
 
 ```bash
 inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose] [--debug]
+inspector run inspection.yaml
 ```
 
 Use `--verbose` to stream professional inspection progress, including indexing,
 agent lifecycle, validation, retry, QA, and final output locations. Stack traces
 are hidden by default and shown only with `--debug`.
+
+Config files support `repoPath`, `outputPath`, `objective`, `targetContext`,
+`agents`, `parallelism`, `maxRetries`, `verbose`, and `runner`. Existing CLI
+flags such as `--objective`, `--out`, and `--verbose` override config values
+where they apply.
 
 ## Goals
 

@@ -102,11 +102,13 @@ Adapter responsibilities include:
 
 - CLI adapters parse arguments, handle user-visible errors, and call application
   use cases.
-- The CLI `run` adapter validates local repository and objective paths, wires
-  concrete filesystem, memory, validation, prompt, schema, QA artifact, final
-  document writer, and runner adapters, prints user-visible progress, and calls the
-  Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst plus QA
-  application use case.
+- The CLI `run` adapter accepts either direct repository/objective/output
+  arguments or a declarative YAML config file, applies reasonable CLI
+  overrides, validates local repository and objective inputs, wires concrete
+  filesystem, memory, validation, prompt, schema, QA artifact, final document
+  writer, and runner adapters, prints user-visible progress, and calls the
+  Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff
+  Analyst plus QA application use case.
 - The current Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst application use case creates the
   run workspace, indexes the repository, initializes memory, builds auditable
   prompts, runs Scout before Architecture before Pattern Miner before Flow
@@ -115,7 +117,8 @@ Adapter responsibilities include:
   from schema-valid and evidence-valid outputs, then runs deterministic QA verification. QA revision requests are grouped by owner
   agent, routed only to that owner as the next attempt, revalidated against the
   owner schema and evidence rules, and followed by final QA so unresolved issues
-  remain visible in QA artifacts when retries are exhausted. The use case then
+  remain visible in QA artifacts when retries are exhausted. Configured
+  `maxRetries` can reduce the owner-retry count for a run. The use case then
   writes the fixed `final/docs/` case-study Markdown package and
   `final/rag_cards/` JSONL package from the final approved findings. Shared
   application step logic handles prompt construction, runner execution, output

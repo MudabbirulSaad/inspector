@@ -692,8 +692,13 @@ async function routeQaRevisionRequests(input: {
   for (const [agentId, revisionRequests] of requestsByOwner) {
     const agent = getAgentContract(agentId);
     const nextAttempt = 2;
+    const retryNumber = nextAttempt - 1;
 
-    if (nextAttempt > agent.retryPolicy.maxAttempts) {
+    if (
+      input.input.config.maxRetries === undefined
+        ? nextAttempt > agent.retryPolicy.maxAttempts
+        : retryNumber > input.input.config.maxRetries
+    ) {
       continue;
     }
 

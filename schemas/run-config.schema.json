@@ -29,6 +29,32 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
-    "verbose": { "type": "boolean" }
+    "verbose": { "type": "boolean" },
+    "targetContext": { "type": "string", "minLength": 1 },
+    "agents": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "parallelism": { "type": "integer", "minimum": 1 },
+    "maxRetries": { "type": "integer", "minimum": 0 },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "timeoutMs": { "type": "integer", "minimum": 1 },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
   }
 }

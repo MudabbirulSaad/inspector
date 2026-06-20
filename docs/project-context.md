@@ -59,9 +59,13 @@ now reviews candidate findings against schema and evidence reports, rejects
 unsupported or contradictory findings, creates owner-agent revision requests,
 writes QA artifacts, appends approved/rejected findings to run memory, and
 computes a deterministic readiness score. The runtime CLI slice now parses
-`inspector run`, validates repository and objective paths, wires concrete
-adapters, prints progress, and calls a Scout/Architecture/Pattern Miner/Flow
-Tracer/Testing Strategy/Tradeoff Analyst plus QA
+direct `inspector run <repo-path> --objective <file> --out <path>` commands and
+declarative `inspector run inspection.yaml` config files. Config files support
+repository path, output path, inline objective, target context, selected agents,
+parallelism, max retries, verbosity, and runner configuration, with CLI flags
+overriding config values where they apply. The CLI validates repository and
+objective inputs, wires concrete adapters, prints progress, and calls a
+Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst plus QA
 application use case. Verbose mode now streams professional progress for run
 start, repository indexing, agent lifecycle, validation, retry routing, QA
 issues, final QA summary, and final output paths, while non-verbose mode remains

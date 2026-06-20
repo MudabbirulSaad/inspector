@@ -555,6 +555,234 @@ test("CLI run creates a run workspace for a valid command", async () => {
   );
 });
 
+test("CLI run accepts a declarative inspection config file", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const runner = successfulRunner();
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect from a declarative config.",
+      "targetContext: Focus on CLI configuration ergonomics.",
+      "agents:",
+      "  - scout",
+      "  - architecture",
+      "parallelism: 2",
+      "maxRetries: 3",
+      "verbose: true",
+      "runner:",
+      "  provider: fake",
+      "",
+    ].join("\n"),
+  );
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner,
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(stdout.join("\n"), /Inspection started: target-repo/);
+  assert.match(runner.requests[0]?.prompt ?? "", /Inspect from a declarative config/);
+  assert.match(
+    runner.requests[0]?.prompt ?? "",
+    /Focus on CLI configuration ergonomics/,
+  );
+
+  const savedConfig = JSON.parse(
+    await readFile(
+      join(
+        fixture.outPath,
+        "2026-06-20T01-02-03-004Z_target-repo",
+        "config.json",
+      ),
+      "utf8",
+    ),
+  ) as {
+    targetContext?: string;
+    agents?: string[];
+    parallelism?: number;
+    maxRetries?: number;
+    runner?: { provider?: string };
+  };
+  assert.equal(savedConfig.targetContext, "Focus on CLI configuration ergonomics.");
+  assert.deepEqual(savedConfig.agents, ["scout", "architecture"]);
+  assert.equal(savedConfig.parallelism, 2);
+  assert.equal(savedConfig.maxRetries, 3);
+  assert.deepEqual(savedConfig.runner, { provider: "fake" });
+});
+
+test("CLI run reports invalid inspection config values clearly", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const stderr: string[] = [];
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect invalid config handling.",
+      "parallelism: 0",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /Invalid inspection config: 'parallelism' must be an integer greater than or equal to 1/,
+  );
+});
+
+test("CLI run lets flags override inspection config values", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const configuredOutPath = join(fixture.tempDirectory, "configured-runs");
+  const overrideOutPath = join(fixture.tempDirectory, "override-runs");
+  const overrideObjectivePath = join(fixture.tempDirectory, "override-objective.md");
+  const runner = successfulRunner();
+  const stdout: string[] = [];
+
+  await writeFile(overrideObjectivePath, "Inspect the CLI override objective.\n");
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${configuredOutPath}`,
+      "objective: This config objective should be replaced.",
+      "verbose: false",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      configPath,
+      "--objective",
+      overrideObjectivePath,
+      "--out",
+      overrideOutPath,
+      "--verbose",
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(stdout.join("\n"), /Inspection started: target-repo/);
+  assert.match(runner.requests[0]?.prompt ?? "", /Inspect the CLI override objective/);
+  assert.doesNotMatch(
+    runner.requests[0]?.prompt ?? "",
+    /This config objective should be replaced/,
+  );
+  assert.equal(
+    (await stat(
+      join(overrideOutPath, "2026-06-20T01-02-03-004Z_target-repo", "config.json"),
+    )).isFile(),
+    true,
+  );
+});
+
+test("CLI run reports missing required inspection config values", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const stderr: string[] = [];
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Invalid inspection config: missing objective/);
+});
+
+test("CLI run uses config maxRetries for QA revision routing", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const contradictoryArchitectureOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        id: "finding-architecture-uses-ports",
+        claim: "Application orchestration uses ports.",
+      },
+      {
+        ...architectureFinding,
+        id: "finding-architecture-does-not-use-ports",
+        claim: "Application orchestration does not use ports.",
+      },
+    ],
+  };
+  const runner = new FakeAgentRunner({
+    results: [
+      successfulScoutResult(),
+      successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
+      successfulPatternMinerResult(),
+      successfulFlowTracerResult(),
+      successfulTestingStrategyResult(),
+      successfulTradeoffAnalystResult(),
+    ],
+  });
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect without retrying QA failures.",
+      "maxRetries: 0",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(
+    runner.requests.map((request) => [request.agentId, request.attempt]),
+    [
+      ["scout", 1],
+      ["architecture", 1],
+      ["pattern_miner", 1],
+      ["flow_tracer", 1],
+      ["testing_strategy", 1],
+      ["tradeoff_analyst", 1],
+    ],
+  );
+});
+
 test("CLI run stays concise without verbose output", async () => {
   const fixture = await createFixture();
   const stdout: string[] = [];
