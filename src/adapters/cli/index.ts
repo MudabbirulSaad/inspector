@@ -1,38 +1,30 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 
-import { getAgentContract } from "../../agents/index.js";
 import {
-  appendSwarmFinding,
-  appendSwarmBlackboardSnapshot,
-  buildAgentPrompt,
-  createInspectionRunWorkspace,
-  executeAgentRun,
-  indexTargetRepository,
-  validateAgentOutput,
-  validateEvidenceReferences,
+  InspectionRunFailedError,
+  runScoutArchitectureInspection,
 } from "../../application/index.js";
+import type { RunConfig } from "../../domain/types.js";
 import type {
-  ArchitectureOutput,
-  Evidence,
-  Finding,
-  RunConfig,
-  ScoutOutput,
-} from "../../domain/types.js";
-import type {
+  AgentOutputArtifactWriter,
+  AgentOutputSchemaReader,
   AgentRunResult,
   AgentRunner,
   Clock,
+  EvidenceValidationReportWriter,
   RepositoryEntry,
+  RepositoryIndexPromptContextReader,
+  RepositoryReader,
   RunWorkspace,
 } from "../../ports/index.js";
 import { createSchemaContractValidators } from "../../validation/index.js";
 import { FakeAgentRunner } from "../codex/index.js";
 import {
-  NodeRepositoryIndexWriter,
-  NodeRepositoryReader,
   NodePromptArtifactWriter,
   NodePromptTemplateReader,
+  NodeRepositoryIndexWriter,
+  NodeRepositoryReader,
   NodeRunWorkspaceStore,
   NodeSwarmMemoryStore,
   NodeValidationReportWriter,
@@ -77,6 +69,8 @@ export async function runInspectorCli(
 
     const objective = await readFile(command.objectivePath, "utf8");
     const repoRoot = resolve(command.repoPath);
+    const repositoryReader = new NodeRepositoryReader(repoRoot);
+    const repositoryEntries = await repositoryReader.listEntries();
     const config: RunConfig = {
       target: {
         name: basename(repoRoot),
@@ -88,202 +82,50 @@ export async function runInspectorCli(
       verbose: command.verbose,
     };
 
-    printProgress(stdout, command.verbose, "Creating run workspace");
-    const workspace = await createInspectionRunWorkspace({
+    const result = await runScoutArchitectureInspection({
       config,
+      objective,
       clock: request.clock ?? systemClock,
+      runner:
+        request.runner ??
+        (await createDefaultRunner(repositoryReader, repositoryEntries)),
       workspaces: new NodeRunWorkspaceStore(),
-    });
-
-    const repositoryReader = new NodeRepositoryReader(repoRoot);
-    const repositoryEntries = await repositoryReader.listEntries();
-    const repositoryFiles = await repositoryFilesWithLineCounts(
       repositoryReader,
-      repositoryEntries,
-    );
-
-    printProgress(stdout, command.verbose, "Indexing repository");
-    await indexTargetRepository({
-      target: config.target,
-      reader: repositoryReader,
-      writer: new NodeRepositoryIndexWriter(),
-      workspace,
-    });
-
-    printProgress(stdout, command.verbose, "Initializing memory");
-    await appendSwarmBlackboardSnapshot({
-      title: "Run initialized",
-      body: `Objective: ${objective.trim()}`,
-      memory: new NodeSwarmMemoryStore(workspace),
-    });
-
-    const validators = await createSchemaContractValidators();
-    const scoutPrompt = await buildAgentPrompt({
-      agentId: "scout",
-      attempt: 1,
-      workspace,
-      templates: new NodePromptTemplateReader("prompts"),
-      artifacts: new NodePromptArtifactWriter(),
-      objective,
-      targetRepoContext: config.target,
-      repoIndexSummary: await readRepositoryIndexPromptContext(workspace),
-      previousOutputs: [],
-      memorySnapshot: await readFile(
-        join(workspace.folders.memory, "blackboard.md"),
-        "utf8",
-      ),
-      outputSchema: JSON.parse(
-        await readFile("schemas/scout-output.schema.json", "utf8"),
-      ) as unknown,
-    });
-
-    printProgress(stdout, command.verbose, "Running Scout");
-    const runner = request.runner ?? createDefaultRunner(repositoryFiles);
-    const scoutRun = await executeAgentRun({
-      runner,
-      agentId: "scout",
-      attempt: 1,
-      prompt: scoutPrompt.prompt,
-      workspaceRoot: workspace.root,
-      onStreamingEvent: (event) => {
+      repositoryIndexWriter: new NodeRepositoryIndexWriter(),
+      repositoryIndexContext: new NodeRepositoryIndexPromptContextReader(),
+      memory: (workspace) => new NodeSwarmMemoryStore(workspace),
+      promptTemplates: new NodePromptTemplateReader("prompts"),
+      promptArtifacts: new NodePromptArtifactWriter(),
+      outputArtifacts: new NodeAgentOutputArtifactWriter(),
+      validationReports: new NodeValidationReportWriter(),
+      evidenceReports: new NodeEvidenceValidationReportWriter(),
+      validators: await createSchemaContractValidators(),
+      schemaReader: new NodeAgentOutputSchemaReader(),
+      progress: (message) => printProgress(stdout, command.verbose, message),
+      stream: (agentId, kind, message) => {
         if (command.verbose) {
-          stdout(`[scout:${event.kind}] ${event.message}`);
+          stdout(`[${agentId}:${kind}] ${message}`);
         }
       },
     });
-    await writeScoutOutput(workspace, scoutRun.stdout);
 
-    printProgress(stdout, command.verbose, "Validating Scout schema");
-    const schemaResult = await validateAgentOutput({
-      workspace,
-      agent: getAgentContract("scout"),
-      attempt: 1,
-      rawOutput: scoutRun.stdout,
-      validators,
-      reports: new NodeValidationReportWriter(),
-    });
-
-    if (!schemaResult.valid) {
-      stderr(`Scout schema validation failed: ${schemaResult.errors[0]?.message}`);
-      return { exitCode: 1, workspace };
-    }
-
-    const scoutOutput = schemaResult.value as ScoutOutput;
-
-    printProgress(stdout, command.verbose, "Validating Scout evidence");
-    const evidenceResult = await validateEvidenceReferences({
-      repositoryFiles,
-      findings: scoutEvidenceFindings(scoutOutput),
-    });
-
-    await writeEvidenceValidationReport(workspace, evidenceResult);
-
-    if (!evidenceResult.valid) {
-      stderr(`Scout evidence validation failed: ${evidenceResult.errors[0]?.message}`);
-      return { exitCode: 1, workspace };
-    }
-
-    const memory = new NodeSwarmMemoryStore(workspace);
-    for (const finding of scoutOutput.findings) {
-      await appendSwarmFinding({
-        finding,
-        memory,
-        validator: validators.finding,
-      });
-    }
-
-    const architecturePrompt = await buildAgentPrompt({
-      agentId: "architecture",
-      attempt: 1,
-      workspace,
-      templates: new NodePromptTemplateReader("prompts"),
-      artifacts: new NodePromptArtifactWriter(),
-      objective,
-      targetRepoContext: config.target,
-      repoIndexSummary: await readRepositoryIndexPromptContext(workspace),
-      previousOutputs: { scout: scoutOutput },
-      memorySnapshot: await readFile(
-        join(workspace.folders.memory, "blackboard.md"),
-        "utf8",
-      ),
-      outputSchema: JSON.parse(
-        await readFile("schemas/architecture-output.schema.json", "utf8"),
-      ) as unknown,
-    });
-
-    printProgress(stdout, command.verbose, "Running Architecture");
-    const architectureRun = await executeAgentRun({
-      runner,
-      agentId: "architecture",
-      attempt: 1,
-      prompt: architecturePrompt.prompt,
-      workspaceRoot: workspace.root,
-      onStreamingEvent: (event) => {
-        if (command.verbose) {
-          stdout(`[architecture:${event.kind}] ${event.message}`);
-        }
-      },
-    });
-    await writeAgentOutput(workspace, "architecture", architectureRun.stdout);
-
-    printProgress(stdout, command.verbose, "Validating Architecture schema");
-    const architectureSchemaResult = await validateAgentOutput({
-      workspace,
-      agent: getAgentContract("architecture"),
-      attempt: 1,
-      rawOutput: architectureRun.stdout,
-      validators,
-      reports: new NodeValidationReportWriter(),
-    });
-
-    if (!architectureSchemaResult.valid) {
-      stderr(
-        `Architecture schema validation failed: ${architectureSchemaResult.errors[0]?.message}`,
-      );
-      return { exitCode: 1, workspace };
-    }
-
-    const architectureOutput =
-      architectureSchemaResult.value as ArchitectureOutput;
-
-    printProgress(stdout, command.verbose, "Validating Architecture evidence");
-    const architectureEvidenceResult = await validateEvidenceReferences({
-      repositoryFiles,
-      findings: architectureEvidenceFindings(architectureOutput),
-    });
-
-    await writeEvidenceValidationReport(
-      workspace,
-      "architecture",
-      architectureEvidenceResult,
-    );
-
-    if (!architectureEvidenceResult.valid) {
-      stderr(
-        `Architecture evidence validation failed: ${architectureEvidenceResult.errors[0]?.message}`,
-      );
-      return { exitCode: 1, workspace };
-    }
-
-    for (const finding of architectureOutput.findings) {
-      await appendSwarmFinding({
-        finding,
-        memory,
-        validator: validators.finding,
-      });
-    }
-
-    stdout(`Inspection run workspace: ${workspace.root}`);
-    return { exitCode: 0, workspace };
+    stdout(`Inspection run workspace: ${result.workspace.root}`);
+    return { exitCode: 0, workspace: result.workspace };
   } catch (error) {
     stderr(error instanceof Error ? error.message : "Unknown CLI error");
-    return { exitCode: 1 };
+    return {
+      exitCode: 1,
+      workspace:
+        error instanceof InspectionRunFailedError ? error.workspace : undefined,
+    };
   }
 }
 
 function parseRunCommand(argv: string[]): ParsedRunCommand {
   if (argv[0] !== "run") {
-    throw new Error("Usage: inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose]");
+    throw new Error(
+      "Usage: inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose]",
+    );
   }
 
   const repoPath = argv[1];
@@ -353,13 +195,11 @@ function printProgress(
   }
 }
 
-function createDefaultRunner(
-  repositoryFiles: { path: string; lineCount: number }[],
-): AgentRunner {
-  const citedFile =
-    repositoryFiles.find((file) => file.lineCount > 0) ??
-    repositoryFiles[0] ??
-    { path: "README.md", lineCount: 1 };
+async function createDefaultRunner(
+  reader: RepositoryReader,
+  entries: RepositoryEntry[],
+): Promise<AgentRunner> {
+  const citedFile = await chooseDefaultEvidenceFile(reader, entries);
   const lineEnd = Math.max(1, Math.min(citedFile.lineCount, 1));
   const scoutResult: AgentRunResult = {
     stdout: `${JSON.stringify({
@@ -383,24 +223,23 @@ function createDefaultRunner(
         },
       ],
       architectureImpression: {
-        summary: "Scout has only enough evidence for a shallow initial repository impression.",
+        summary:
+          "Scout has only enough evidence for a shallow initial repository impression.",
         evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
       },
-      openQuestions: ["Which source entrypoint should deeper agents inspect first?"],
+      openQuestions: [
+        "Which source entrypoint should deeper agents inspect first?",
+      ],
       findings: [
         {
           id: "finding-scout-001",
           agent: "scout",
           severity: "info",
-          claim: "The inspected repository has an initial file for Scout review.",
-          evidence: [
-            {
-              file: citedFile.path,
-              lineStart: 1,
-              lineEnd,
-            },
-          ],
-          recommendation: "Use this repository inventory as the starting point for deeper inspection.",
+          claim:
+            "The inspected repository has an initial file for Scout review.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          recommendation:
+            "Use this repository inventory as the starting point for deeper inspection.",
           confidence: 0.5,
           validation: ["schema-valid", "evidence-valid"],
         },
@@ -432,7 +271,8 @@ function createDefaultRunner(
           name: "Inspection input direction",
           source: citedFile.path,
           target: "architecture agent",
-          direction: "repository evidence is consumed by the architecture agent",
+          direction:
+            "repository evidence is consumed by the architecture agent",
           observedFacts: [
             `${citedFile.path} is cited as the available repository evidence.`,
           ],
@@ -490,13 +330,7 @@ function createDefaultRunner(
           severity: "info",
           claim:
             "The default Architecture result has only shallow repository evidence.",
-          evidence: [
-            {
-              file: citedFile.path,
-              lineStart: 1,
-              lineEnd,
-            },
-          ],
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
           recommendation:
             "Configure a real agent runner before relying on architecture findings.",
           confidence: 0.4,
@@ -515,184 +349,138 @@ function createDefaultRunner(
   return new FakeAgentRunner({ results: [scoutResult, architectureResult] });
 }
 
-async function readRepositoryIndexPromptContext(
-  workspace: RunWorkspace,
-): Promise<Record<string, unknown>> {
-  return {
-    repo_summary: JSON.parse(
-      await readFile(join(workspace.folders.repoIndex, "repo_summary.json"), "utf8"),
-    ) as unknown,
-    important_files: JSON.parse(
-      await readFile(
-        join(workspace.folders.repoIndex, "important_files.json"),
-        "utf8",
-      ),
-    ) as unknown,
-    detected_stack: JSON.parse(
-      await readFile(
-        join(workspace.folders.repoIndex, "detected_stack.json"),
-        "utf8",
-      ),
-    ) as unknown,
-    detected_commands: JSON.parse(
-      await readFile(
-        join(workspace.folders.repoIndex, "detected_commands.json"),
-        "utf8",
-      ),
-    ) as unknown,
-    file_tree: await readFile(
-      join(workspace.folders.repoIndex, "file_tree.txt"),
-      "utf8",
-    ),
-  };
-}
-
-function scoutEvidenceFindings(output: ScoutOutput): Finding[] {
-  return [
-    evidenceFinding(
-      "finding-scout-project-type",
-      `Scout identified project type: ${output.projectType.value}`,
-      output.projectType.evidence,
-    ),
-    ...output.detectedStack.map((signal, index) =>
-      evidenceFinding(
-        `finding-scout-stack-${index + 1}`,
-        `Scout detected stack signal: ${signal.name}`,
-        signal.evidence,
-      ),
-    ),
-    ...output.importantFiles.map((file, index) =>
-      evidenceFinding(
-        `finding-scout-important-file-${index + 1}`,
-        `Scout marked ${file.path} as important: ${file.reason}`,
-        file.evidence,
-      ),
-    ),
-    ...output.entryPoints.map((entryPoint, index) =>
-      evidenceFinding(
-        `finding-scout-entrypoint-${index + 1}`,
-        `Scout marked ${entryPoint.path} as an entry point: ${entryPoint.kind}`,
-        entryPoint.evidence,
-      ),
-    ),
-    evidenceFinding(
-      "finding-scout-architecture-impression",
-      output.architectureImpression.summary,
-      output.architectureImpression.evidence,
-    ),
-    ...output.findings,
-  ];
-}
-
-function evidenceFinding(id: string, claim: string, evidence: Evidence[]): Finding {
-  return {
-    id,
-    agent: "scout",
-    severity: "info",
-    claim,
-    evidence,
-    recommendation: "Use this Scout observation only as initial inspection context.",
-    confidence: 0.5,
-  };
-}
-
-async function writeScoutOutput(
-  workspace: RunWorkspace,
-  content: string,
-): Promise<void> {
-  await writeAgentOutput(workspace, "scout", content);
-}
-
-async function writeAgentOutput(
-  workspace: RunWorkspace,
-  agentId: string,
-  content: string,
-): Promise<void> {
-  const directory = join(workspace.folders.agents, agentId, "attempt-1");
-  await mkdir(directory, { recursive: true });
-  await writeFile(join(directory, "output.json"), content);
-}
-
-async function writeEvidenceValidationReport(
-  workspace: RunWorkspace,
-  agentIdOrResult: string | unknown,
-  maybeResult?: unknown,
-): Promise<void> {
-  const agentId = typeof agentIdOrResult === "string" ? agentIdOrResult : "scout";
-  const result = typeof agentIdOrResult === "string" ? maybeResult : agentIdOrResult;
-  const directory = join(workspace.folders.validation, agentId, "attempt-1");
-  await mkdir(directory, { recursive: true });
-  await writeFile(
-    join(directory, "evidence.json"),
-    `${JSON.stringify(result, null, 2)}\n`,
-  );
-}
-
-function architectureEvidenceFindings(output: ArchitectureOutput): Finding[] {
-  return [
-    ...output.layerMap.map((item, index) =>
-      architectureObservationFinding("layer-map", index, item),
-    ),
-    ...output.dependencyDirection.map((item, index) =>
-      architectureObservationFinding(
-        "dependency-direction",
-        index,
-        item,
-        `${item.source} -> ${item.target}: ${item.direction}`,
-      ),
-    ),
-    ...output.moduleBoundaries.map((item, index) =>
-      architectureObservationFinding("module-boundary", index, item),
-    ),
-    ...output.businessLogicLocations.map((item, index) =>
-      architectureObservationFinding("business-logic", index, item),
-    ),
-    ...output.frameworkGlueLocations.map((item, index) =>
-      architectureObservationFinding("framework-glue", index, item),
-    ),
-    ...output.architectureRisks.map((item, index) =>
-      architectureObservationFinding("risk", index, item),
-    ),
-    ...output.findings,
-  ];
-}
-
-function architectureObservationFinding(
-  kind: string,
-  index: number,
-  observation: {
-    name: string;
-    observedFacts: string[];
-    interpretation?: string;
-    evidence: Evidence[];
-  },
-  detail = observation.name,
-): Finding {
-  return {
-    id: `finding-architecture-${kind}-${index + 1}`,
-    agent: "architecture",
-    severity: "info",
-    claim: `${detail}: ${observation.observedFacts.join(" ")}`,
-    evidence: observation.evidence,
-    recommendation:
-      observation.interpretation ??
-      "Treat this architecture observation as evidence-backed context.",
-    confidence: 0.5,
-  };
-}
-
-async function repositoryFilesWithLineCounts(
-  reader: NodeRepositoryReader,
+async function chooseDefaultEvidenceFile(
+  reader: RepositoryReader,
   entries: RepositoryEntry[],
-): Promise<{ path: string; lineCount: number }[]> {
-  return Promise.all(
-    entries
-      .filter((entry) => entry.kind === "file")
-      .map(async (entry) => ({
-        path: entry.path,
-        lineCount: countLines(await reader.readTextFile(entry.path)),
-      })),
-  );
+): Promise<{ path: string; lineCount: number }> {
+  const candidate =
+    entries.find(
+      (entry) =>
+        entry.kind === "file" &&
+        !isIgnoredRepositoryEntry(entry.path) &&
+        (entry.sizeBytes ?? 0) <= 1_000_000,
+    ) ?? entries.find((entry) => entry.kind === "file");
+
+  if (candidate === undefined) {
+    return { path: "README.md", lineCount: 1 };
+  }
+
+  try {
+    return {
+      path: candidate.path,
+      lineCount: countLines(await reader.readTextFile(candidate.path)),
+    };
+  } catch {
+    return { path: candidate.path, lineCount: 1 };
+  }
+}
+
+class NodeAgentOutputArtifactWriter implements AgentOutputArtifactWriter {
+  async writeAgentOutput(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.agents,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "output.json");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+class NodeEvidenceValidationReportWriter
+  implements EvidenceValidationReportWriter
+{
+  async writeEvidenceValidationReport(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.validation,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "evidence.json");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+class NodeAgentOutputSchemaReader implements AgentOutputSchemaReader {
+  async readAgentOutputSchema(contract: string): Promise<unknown> {
+    return JSON.parse(
+      await readFile(`schemas/${contract}.schema.json`, "utf8"),
+    ) as unknown;
+  }
+}
+
+class NodeRepositoryIndexPromptContextReader
+  implements RepositoryIndexPromptContextReader
+{
+  async readRepositoryIndexPromptContext(
+    workspace: RunWorkspace,
+  ): Promise<unknown> {
+    return {
+      repo_summary: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "repo_summary.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      important_files: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "important_files.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      detected_stack: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "detected_stack.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      detected_commands: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "detected_commands.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      file_tree: await readFile(
+        join(workspace.folders.repoIndex, "file_tree.txt"),
+        "utf8",
+      ),
+    };
+  }
+}
+
+function isIgnoredRepositoryEntry(path: string): boolean {
+  return path
+    .split("/")
+    .some((segment) =>
+      new Set([
+        ".cache",
+        ".git",
+        ".next",
+        "build",
+        "coverage",
+        "dist",
+        "node_modules",
+        "vendor",
+      ]).has(segment),
+    );
 }
 
 function countLines(content: string): number {

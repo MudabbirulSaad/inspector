@@ -4,6 +4,8 @@
 
 The current runtime slice supports Scout and Architecture inspection runs. It creates a run workspace, indexes a repository, initializes memory, builds audited prompts from repository index context, runs Scout first, feeds validated Scout output into Architecture, validates both agents' structured outputs and evidence, and appends only candidate findings to memory.
 
+The current standalone CLI runtime uses a deterministic fake runner by default. Real process-backed runner infrastructure exists, but CLI configuration for real Codex execution is not exposed yet.
+
 ```bash
 inspector run <repo-path> --objective <objective-file> --out <output-path> --verbose
 ```

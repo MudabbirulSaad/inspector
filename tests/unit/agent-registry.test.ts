@@ -121,6 +121,25 @@ test("every agent contract defines scheduling, artifact, retry, and revision own
   }
 });
 
+test("agent registry output artifacts match the attempt-based runtime layout", () => {
+  assert.deepEqual(getAgentContract("scout").outputArtifacts, [
+    "agents/scout/attempt-{attempt}/output.json",
+  ]);
+  assert.deepEqual(getAgentContract("architecture").outputArtifacts, [
+    "agents/architecture/attempt-{attempt}/output.json",
+  ]);
+  assert.deepEqual(getAgentContract("pattern_miner").outputArtifacts, [
+    "agents/pattern_miner/attempt-{attempt}/output.json",
+  ]);
+  assert.deepEqual(getAgentContract("qa_verifier").outputArtifacts, [
+    "qa/results.json",
+  ]);
+  assert.deepEqual(getAgentContract("final_reviewer").outputArtifacts, [
+    "final/inspection-report.json",
+    "final/case-study.md",
+  ]);
+});
+
 test("agent registry callers cannot mutate stored contract definitions", () => {
   const [scout] = getAgentContracts();
   assert.ok(scout);
@@ -130,7 +149,7 @@ test("agent registry callers cannot mutate stored contract definitions", () => {
 
   assert.deepEqual(getAgentContract("scout").dependencies, []);
   assert.deepEqual(getAgentContract("scout").outputArtifacts, [
-    "agents/scout/output.json",
+    "agents/scout/attempt-{attempt}/output.json",
   ]);
   assert.deepEqual(getAgentContract("scout").qaRevisionOwnership, {
     ownsRevisionFor: ["scout"],

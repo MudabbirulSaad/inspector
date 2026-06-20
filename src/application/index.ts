@@ -11,6 +11,7 @@ export * from "./write-agent-lifecycle-status.js";
 export * from "./schedule-agent-graph.js";
 export * from "./validate-agent-output.js";
 export * from "./validate-evidence-references.js";
+export * from "./run-scout-architecture-inspection.js";
 
 export const applicationBoundary = "application" as const;
 

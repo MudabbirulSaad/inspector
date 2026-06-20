@@ -50,6 +50,10 @@ export interface RepositoryIndexWriter {
   writeText(directory: string, path: string, content: string): Promise<void>;
 }
 
+export interface RepositoryIndexPromptContextReader {
+  readRepositoryIndexPromptContext(workspace: RunWorkspace): Promise<unknown>;
+}
+
 export type SwarmMemoryStream =
   | "events"
   | "findings"
@@ -101,6 +105,28 @@ export interface ValidationReportWriter {
     attempt: number;
     content: string;
   }): Promise<{ path: string }>;
+}
+
+export interface EvidenceValidationReportWriter {
+  writeEvidenceValidationReport(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }>;
+}
+
+export interface AgentOutputArtifactWriter {
+  writeAgentOutput(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }>;
+}
+
+export interface AgentOutputSchemaReader {
+  readAgentOutputSchema(contract: string): Promise<unknown>;
 }
 
 export type AgentRunnerStreamEventKind =

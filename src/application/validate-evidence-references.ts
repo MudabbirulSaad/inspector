@@ -4,9 +4,11 @@ import type {
   KnowledgeCard,
   QaResult,
 } from "../domain/types.js";
+import type { RepositoryEntry, RepositoryReader } from "../ports/index.js";
 
 export type EvidenceValidationErrorCode =
   | "missing-file"
+  | "unreadable-file"
   | "invalid-line-range"
   | "path-outside-repository"
   | "missing-evidence"
@@ -16,6 +18,8 @@ export type EvidenceValidationErrorCode =
 export interface EvidenceRepositoryFile {
   path: string;
   lineCount: number;
+  unreadable?: boolean;
+  unreadableReason?: string;
 }
 
 export interface EvidenceValidationError {
@@ -38,6 +42,77 @@ export interface ValidateEvidenceReferencesRequest {
 export interface EvidenceValidationResult {
   valid: boolean;
   errors: EvidenceValidationError[];
+}
+
+const evidenceTextMaxBytes = 1_000_000;
+const ignoredEvidenceFolders = new Set([
+  ".cache",
+  ".git",
+  ".next",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "vendor",
+]);
+
+export async function repositoryFilesForEvidence(
+  reader: RepositoryReader,
+  entries: RepositoryEntry[],
+  evidence: Evidence[],
+  maxFileSizeBytes = evidenceTextMaxBytes,
+): Promise<EvidenceRepositoryFile[]> {
+  const entryByPath = new Map(
+    entries
+      .filter((entry) => entry.kind === "file")
+      .filter((entry) => !isIgnoredRepositoryEntry(entry.path))
+      .map((entry) => [normalizeRepositoryPath(entry.path), entry]),
+  );
+  const citedPaths = [
+    ...new Set(
+      evidence
+        .filter((item) => isRepositoryRelativePath(item.file))
+        .map((item) => normalizeRepositoryPath(item.file)),
+    ),
+  ].sort();
+  const files: EvidenceRepositoryFile[] = [];
+
+  for (const path of citedPaths) {
+    const entry = entryByPath.get(path);
+
+    if (entry === undefined) {
+      continue;
+    }
+
+    if ((entry.sizeBytes ?? 0) > maxFileSizeBytes) {
+      files.push({
+        path: entry.path,
+        lineCount: 0,
+        unreadable: true,
+        unreadableReason: `Cited evidence file is too large to read safely: ${entry.path}`,
+      });
+      continue;
+    }
+
+    try {
+      files.push({
+        path: entry.path,
+        lineCount: countLines(await reader.readTextFile(entry.path)),
+      });
+    } catch (error) {
+      files.push({
+        path: entry.path,
+        lineCount: 0,
+        unreadable: true,
+        unreadableReason:
+          error instanceof Error
+            ? `Cited evidence file cannot be read as text: ${entry.path}: ${error.message}`
+            : `Cited evidence file cannot be read as text: ${entry.path}`,
+      });
+    }
+  }
+
+  return files;
 }
 
 export function validateEvidenceReferences(
@@ -192,7 +267,26 @@ function validateEvidence(
     ];
   }
 
-  if (evidence.lineStart > evidence.lineEnd || evidence.lineEnd > file.lineCount) {
+  if (file.unreadable === true) {
+    return [
+      {
+        code: "unreadable-file",
+        artifactType,
+        artifactId,
+        evidenceFile: evidence.file,
+        message:
+          file.unreadableReason ??
+          `Cited evidence file cannot be read as text: ${evidence.file}`,
+      },
+    ];
+  }
+
+  if (
+    evidence.lineStart < 1 ||
+    evidence.lineEnd < 1 ||
+    evidence.lineStart > evidence.lineEnd ||
+    evidence.lineEnd > file.lineCount
+  ) {
     return [
       {
         code: "invalid-line-range",
@@ -221,4 +315,20 @@ function isRepositoryRelativePath(path: string): boolean {
     !/^[A-Za-z]:/.test(normalizedPath) &&
     !segments.includes("..")
   );
+}
+
+function isIgnoredRepositoryEntry(path: string): boolean {
+  return normalizeRepositoryPath(path)
+    .split("/")
+    .some((segment) => ignoredEvidenceFolders.has(segment));
+}
+
+function countLines(content: string): number {
+  if (content.length === 0) {
+    return 0;
+  }
+
+  return content.endsWith("\n")
+    ? content.split("\n").length - 1
+    : content.split("\n").length;
 }
