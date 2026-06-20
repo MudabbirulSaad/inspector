@@ -25,13 +25,22 @@ Use a modular hexagonal architecture. Keep domain and application logic independ
 
 Use TDD for production code and validation scripts. Work in vertical slices: one behavior test, the smallest implementation, then refactor while green. Tests should verify public behavior rather than private implementation details.
 
-Run the relevant validation before committing. Today the available validation is:
+Run the relevant validation before committing. The current validation scripts are:
 
 ```bash
 npm test
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Add `typecheck`, `lint`, and `build` scripts only when their required configuration and source files exist.
+Use the aggregate validation gate when validating the full repository:
+
+```bash
+npm run validate
+```
+
+Do not claim validation passed unless the command actually ran and passed.
 
 ## Output Evidence Rules
 
