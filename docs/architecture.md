@@ -142,8 +142,9 @@ Adapter responsibilities include:
   unique suffix when a timestamped workspace already exists.
 - Filesystem repository adapters walk target repositories, provide
   repository-relative file metadata and manifest text to the application layer,
-  and write approved `repo_index/` artifacts without leaking Node filesystem
-  APIs into the core.
+  reject file reads that escape the configured repository root, and write
+  approved `repo_index/` artifacts without leaking Node filesystem APIs into
+  the core.
 - Process adapters run local commands behind deterministic ports, capture
   stdout and stderr, emit stream events, enforce configured timeouts, and return
   structured command results without hardcoded command behavior.

@@ -126,7 +126,11 @@ pending specialist stages from lifecycle artifacts, plus
 `inspector resume <run-dir>` for safely continuing incomplete runs from the
 existing workspace. Resume reuses completed specialist outputs, does not rerun
 approved or completed agents, retries failed or pending stages in place, and
-fails when run state is ambiguous, such as a completed stage missing its output.
+fails when run state is ambiguous or corrupted, such as a completed stage
+missing its output or containing malformed output JSON. Filesystem repository
+reads are contained to the configured repository root so production adapters do
+not read outside the inspected target even if called with an unsafe relative
+path.
 Full scheduler-driven
 multi-agent orchestration is still pending.
 

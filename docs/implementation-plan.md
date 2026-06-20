@@ -1623,3 +1623,44 @@ git status
 ```bash
 chore(package): prepare inspector CLI binary
 ```
+
+### Milestone 37: Production Hardening Pass
+
+#### Goal
+
+Perform a production-readiness review without adding large new features.
+
+#### Tasks
+
+- Reviewed architecture boundaries, CLI/runtime behavior, filesystem access,
+  process execution, validation, QA, resume, final output, RAG-card, logging,
+  and documentation surfaces against the current implementation.
+- Hardened the filesystem repository reader so text reads are rejected when a
+  caller supplies an absolute path or a relative path that escapes the inspected
+  repository root.
+- Hardened resume state loading so completed agent outputs with malformed JSON
+  fail as corrupted run state instead of being treated as missing optional
+  output.
+- Updated public architecture and project-context documentation to reflect the
+  adapter containment and resume-corruption behavior.
+
+#### TDD
+
+Added focused integration tests one behavior at a time for repository-reader
+path containment and malformed completed-agent output during resume.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+chore(hardening): complete production readiness review
+```

@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type {
   AgentOutputArtifactWriter,
@@ -81,7 +81,7 @@ export class NodeRepositoryReader implements RepositoryReader {
   }
 
   async readTextFile(path: string): Promise<string> {
-    return readFile(join(this.root, path), "utf8");
+    return readFile(resolveRepositoryPath(this.root, path), "utf8");
   }
 
   private async walkDirectory(relativeDirectory: string): Promise<RepositoryEntry[]> {
@@ -117,6 +117,26 @@ export class NodeRepositoryReader implements RepositoryReader {
 
     return entries;
   }
+}
+
+function resolveRepositoryPath(root: string, path: string): string {
+  if (isAbsolute(path)) {
+    throw new Error(`Repository path is outside the repository root: ${path}`);
+  }
+
+  const resolvedRoot = resolve(root);
+  const resolvedPath = resolve(resolvedRoot, path);
+  const relativePath = relative(resolvedRoot, resolvedPath);
+
+  if (
+    relativePath === ".." ||
+    relativePath.startsWith(`..${sep}`) ||
+    isAbsolute(relativePath)
+  ) {
+    throw new Error(`Repository path is outside the repository root: ${path}`);
+  }
+
+  return resolvedPath;
 }
 
 export class NodeRepositoryIndexWriter implements RepositoryIndexWriter {

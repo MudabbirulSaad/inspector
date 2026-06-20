@@ -769,6 +769,61 @@ test("CLI resume fails safely when completed agent state is missing output", asy
   assert.equal(runner.requests.length, 0);
 });
 
+test("CLI resume fails safely when completed agent output is malformed", async () => {
+  const fixture = await createFixture();
+  const runDirectory = join(fixture.outPath, "corrupted-output-run");
+  await mkdir(join(runDirectory, "repo_index"), { recursive: true });
+  await mkdir(join(runDirectory, "memory"), { recursive: true });
+  await mkdir(join(runDirectory, "validation"), { recursive: true });
+  await mkdir(join(runDirectory, "agents", "scout", "attempt-1"), {
+    recursive: true,
+  });
+  await writeFile(
+    join(runDirectory, "config.json"),
+    `${JSON.stringify({
+      target: { name: "target-repo", root: fixture.repoPath },
+      outputDirectory: fixture.outPath,
+      agentRoles: ["documentation"],
+      validationCommands: [],
+      runQualityCommands: false,
+    })}\n`,
+  );
+  await writeFile(join(runDirectory, "memory", "blackboard.md"), "Objective: Inspect safely.\n");
+  await writeFile(join(runDirectory, "repo_index", "repo_summary.json"), "{}\n");
+  await writeFile(join(runDirectory, "repo_index", "important_files.json"), "[]\n");
+  await writeFile(join(runDirectory, "repo_index", "detected_stack.json"), "{}\n");
+  await writeFile(join(runDirectory, "repo_index", "detected_commands.json"), "{}\n");
+  await writeFile(join(runDirectory, "repo_index", "file_tree.txt"), ".\nREADME.md\n");
+  await writeFile(
+    join(runDirectory, "validation", "command_report.json"),
+    `${JSON.stringify({ skipped: true, reason: "disabled", commands: [] })}\n`,
+  );
+  await writeFile(
+    join(runDirectory, "agents", "scout", "attempt-1", "status.json"),
+    `${JSON.stringify({ agentId: "scout", status: "APPROVED", attempts: 1 })}\n`,
+  );
+  await writeFile(
+    join(runDirectory, "agents", "scout", "attempt-1", "output.json"),
+    "{not-json",
+  );
+  const stderr: string[] = [];
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: ["resume", runDirectory],
+    runner,
+    stdout: () => undefined,
+    stderr: (line) => stderr.push(line),
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /Corrupted run state: malformed output for scout attempt 1/,
+  );
+  assert.equal(runner.requests.length, 0);
+});
+
 test("CLI run writes a skipped command report by default without invoking the process runner", async () => {
   const fixture = await createFixture();
   const processRunner = new RecordingProcessRunner();

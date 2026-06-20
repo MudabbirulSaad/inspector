@@ -458,8 +458,10 @@ async function readLatestAgentStatusSnapshot(
     throw new Error(`Corrupted run state: invalid status for ${agentId}`);
   }
 
-  const output = await readOptionalJson(
+  const output = await readOptionalAgentOutput(
     join(agentDirectory, `attempt-${latestAttempt}`, "output.json"),
+    agentId,
+    latestAttempt,
   );
 
   return {
@@ -499,12 +501,37 @@ function isFailedStatus(status: RuntimeStageStatus): boolean {
   );
 }
 
-async function readOptionalJson(path: string): Promise<unknown | undefined> {
+async function readOptionalAgentOutput(
+  path: string,
+  agentId: RuntimeSpecialistAgentId,
+  attempt: number,
+): Promise<unknown | undefined> {
+  let content: string;
   try {
-    return JSON.parse(await readFile(path, "utf8")) as unknown;
-  } catch {
-    return undefined;
+    content = await readFile(path, "utf8");
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return undefined;
+    }
+
+    throw new Error(
+      `Corrupted run state: cannot read output for ${agentId} attempt ${attempt}`,
+      { cause: error },
+    );
   }
+
+  try {
+    return JSON.parse(content) as unknown;
+  } catch (error) {
+    throw new Error(
+      `Corrupted run state: malformed output for ${agentId} attempt ${attempt}`,
+      { cause: error },
+    );
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 async function parseRunCommand(argv: string[]): Promise<ParsedRunCommand> {

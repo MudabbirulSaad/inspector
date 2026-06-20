@@ -360,6 +360,23 @@ test("walks a target repository and writes repo_index artifacts through filesyst
   );
 });
 
+test("filesystem repository reader rejects text reads outside the repository root", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "inspector-reader-"));
+  const targetRoot = join(tempDirectory, "target");
+
+  await mkdir(targetRoot, { recursive: true });
+  await writeFile(join(targetRoot, "README.md"), "# Example\n");
+  await writeFile(join(tempDirectory, "outside.txt"), "secret\n");
+
+  const reader = new NodeRepositoryReader(targetRoot);
+
+  assert.equal(await reader.readTextFile("README.md"), "# Example\n");
+  await assert.rejects(
+    () => reader.readTextFile("../outside.txt"),
+    /outside the repository root/,
+  );
+});
+
 test("detects Node package scripts as quality commands", async () => {
   const reader = new InMemoryRepositoryReader(
     [
