@@ -100,11 +100,14 @@ Adapter responsibilities include:
   repository-relative file metadata and manifest text to the application layer,
   and write approved `repo_index/` artifacts without leaking Node filesystem
   APIs into the core.
-- Process adapters run local commands behind deterministic ports.
+- Process adapters run local commands behind deterministic ports, capture
+  stdout and stderr, emit stream events, enforce configured timeouts, and return
+  structured command results without hardcoded command behavior.
 - Agent runner adapters invoke external AI workers and return structured raw
   outputs, streaming events, artifact paths, timestamps, exit codes, and failure
-  reasons for validation. The current fake agent runner is deterministic for
-  tests; real Codex invocation remains an adapter concern.
+  reasons for validation. The fake agent runner is deterministic for tests. The
+  process-backed Codex runner requires explicit local CLI command configuration
+  and delegates command execution to the process runner port.
 - Memory adapters persist local swarm events without exposing raw prompts,
   transcripts, secrets, or private state in public docs. Run memory is
   append-only and lives under the run workspace `memory/` folder.

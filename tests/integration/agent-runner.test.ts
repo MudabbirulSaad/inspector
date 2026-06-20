@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execPath } from "node:process";
 
 import { executeAgentRun } from "../../src/application/index.js";
-import { FakeAgentRunner } from "../../src/adapters/codex/index.js";
+import {
+  FakeAgentRunner,
+  ProcessCodexAgentRunner,
+} from "../../src/adapters/codex/index.js";
+import { NodeProcessRunner } from "../../src/adapters/process/index.js";
 import type {
   AgentRunner,
   AgentRunRequest,
@@ -162,4 +167,107 @@ test("application executes agents through the runner port", async () => {
   assert.deepEqual(result.outputArtifactPaths, [
     "agents/final_reviewer/attempt-1/output.json",
   ]);
+});
+
+test("process Codex agent runner uses an explicitly configured command", async () => {
+  const runner = new ProcessCodexAgentRunner({
+    processRunner: new NodeProcessRunner(),
+    command: execPath,
+    args: ["-e", "console.log(`prompt:${process.argv[1]}`)", "{prompt}"],
+    outputArtifactPaths: ["agents/scout/attempt-1/output.json"],
+  });
+
+  const result = await runner.runAgent({
+    agentId: "scout",
+    attempt: 1,
+    prompt: "Inspect repository.",
+    workspaceRoot: process.cwd(),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdout, "prompt:Inspect repository.\n");
+  assert.equal(result.stderr, "");
+  assert.deepEqual(result.outputArtifactPaths, [
+    "agents/scout/attempt-1/output.json",
+  ]);
+  assert.equal(result.failureReason, undefined);
+});
+
+test("process Codex agent runner streams stdout and stderr events", async () => {
+  const runner = new ProcessCodexAgentRunner({
+    processRunner: new NodeProcessRunner(),
+    command: execPath,
+    args: [
+      "-e",
+      "process.stdout.write('agent stdout'); process.stderr.write('agent stderr')",
+    ],
+  });
+  const capturedEvents: unknown[] = [];
+
+  const result = await runner.runAgent({
+    agentId: "architecture",
+    attempt: 2,
+    prompt: "Inspect architecture.",
+    workspaceRoot: process.cwd(),
+    onStreamingEvent: (event) => {
+      capturedEvents.push(event);
+    },
+  });
+
+  assert.equal(result.stdout, "agent stdout");
+  assert.equal(result.stderr, "agent stderr");
+  assert.deepEqual(
+    result.streamingEvents.map((event) => ({
+      kind: event.kind,
+      message: event.message,
+    })),
+    [
+      { kind: "stdout", message: "agent stdout" },
+      { kind: "stderr", message: "agent stderr" },
+    ],
+  );
+  assert.deepEqual(capturedEvents, result.streamingEvents);
+});
+
+test("process Codex agent runner returns a structured failed result", async () => {
+  const runner = new ProcessCodexAgentRunner({
+    processRunner: new NodeProcessRunner(),
+    command: execPath,
+    args: [
+      "-e",
+      "console.log('agent partial'); console.error('agent failed'); process.exit(4)",
+    ],
+  });
+
+  const result = await runner.runAgent({
+    agentId: "pattern_miner",
+    attempt: 1,
+    prompt: "Inspect patterns.",
+    workspaceRoot: process.cwd(),
+  });
+
+  assert.equal(result.exitCode, 4);
+  assert.equal(result.stdout, "agent partial\n");
+  assert.equal(result.stderr, "agent failed\n");
+  assert.equal(result.failureReason, "process exited with code 4");
+});
+
+test("process Codex agent runner times out configured commands", async () => {
+  const runner = new ProcessCodexAgentRunner({
+    processRunner: new NodeProcessRunner(),
+    command: execPath,
+    args: ["-e", "setTimeout(() => console.log('too late'), 200)"],
+    timeoutMs: 10,
+  });
+
+  const result = await runner.runAgent({
+    agentId: "qa_verifier",
+    attempt: 1,
+    prompt: "Verify findings.",
+    workspaceRoot: process.cwd(),
+  });
+
+  assert.notEqual(result.exitCode, 0);
+  assert.equal(result.stdout, "");
+  assert.equal(result.failureReason, "process timed out after 10ms");
 });

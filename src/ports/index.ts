@@ -126,6 +126,16 @@ export interface ProcessRunRequest {
   args: string[];
   cwd: string;
   env?: Record<string, string>;
+  timeoutMs?: number;
+  onStreamingEvent?: (event: ProcessRunStreamEvent) => void | Promise<void>;
+}
+
+export type ProcessRunStreamEventKind = "stdout" | "stderr" | "status";
+
+export interface ProcessRunStreamEvent {
+  timestamp: string;
+  kind: ProcessRunStreamEventKind;
+  message: string;
 }
 
 export interface ProcessRunResult {
@@ -134,6 +144,7 @@ export interface ProcessRunResult {
   exitCode: number;
   startedAt: string;
   completedAt: string;
+  streamingEvents: ProcessRunStreamEvent[];
   failureReason?: string;
 }
 

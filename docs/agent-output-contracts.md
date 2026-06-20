@@ -76,3 +76,12 @@ repository index summary, previous outputs, memory snapshot, output schema,
 evidence rules, and revision request context for retry attempts. The exact
 assembled prompt is saved in the run workspace under
 `agents/<agent-id>/attempt-<n>/prompt.md`.
+
+## Runner Results
+
+Agent execution uses the `AgentRunner` port. Fake runner results are
+deterministic for orchestration tests. The process-backed Codex runner requires
+callers to provide the local command and argument template explicitly, then
+returns stdout, stderr, exit code, timestamps, output artifact paths, streaming
+events, and failure reasons. Tests exercise the real process path with harmless
+fixture commands rather than invoking a live Codex CLI.

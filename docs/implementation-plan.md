@@ -28,11 +28,11 @@ contract-first baseline:
 
 Runtime CLI implementation has not started. The current source tree does not
 contain CLI argument parsing, full orchestration services, real process
-execution, real Codex execution, or final writer adapters. Filesystem adapters
-now exist for auditable run workspace creation, deterministic repository
-indexing, append-only run memory, prompt template loading, and prompt artifact
-writing. Runner ports now exist with a fake agent runner and process-runner
-placeholder for deterministic orchestration tests.
+execution, or final writer adapters. Filesystem adapters now exist for
+auditable run workspace creation, deterministic repository indexing,
+append-only run memory, prompt template loading, and prompt artifact writing.
+Runner ports now exist with deterministic fake and process-backed Codex agent
+runners plus a real Node process runner for local command execution.
 
 ## Fixed Milestones
 
@@ -557,4 +557,48 @@ git status
 
 ```bash
 feat(codex): introduce agent runner port and fake adapter
+```
+
+### Milestone 13: Process-Based Codex Runner
+
+#### Goal
+
+Implement the real process-based runner adapter.
+
+#### Tasks
+
+- Replaced the process-runner placeholder with a Node process adapter that runs
+  configured external commands.
+- Captured stdout and stderr while also emitting stdout and stderr stream
+  events.
+- Added timeout support that terminates only the configured child process and
+  returns a structured timeout failure.
+- Honored the requested working directory for command execution.
+- Returned structured process and agent results with stdout, stderr, exit code,
+  timestamps, streaming events, artifact paths, and failure reasons.
+- Added a process-backed Codex agent runner that requires explicit local command
+  and argument configuration instead of hardcoding a Codex CLI invocation.
+- Kept tests on harmless Node fixture commands rather than invoking real Codex.
+
+#### TDD
+
+Added runner tests one behavior at a time for process success, non-zero
+failure, working-directory execution, timeout handling, stdout/stderr capture,
+streaming events, explicit process-backed Codex configuration, Codex runner
+failure, and Codex runner timeout.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(codex): run agents through process adapter
 ```

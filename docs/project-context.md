@@ -37,11 +37,12 @@ store for swarm events, decisions, findings, QA issues, verified/rejected
 findings, and blackboard snapshots, plus a fixed agent registry for V1 and later
 inspection agent contracts. It now has auditable prompt templates for required
 V1 agents, plus application and filesystem ports that build exact agent prompts
-from run context and save those prompts under the run workspace. Runtime CLI
-behavior is still pending. Agent execution is now abstracted behind an
-`AgentRunner` port with a deterministic fake adapter for success, failure, and
-streaming-event tests; real Codex execution and real process execution remain
-pending adapter work.
+from run context and save those prompts under the run workspace. Agent execution
+is abstracted behind an `AgentRunner` port with deterministic fake and
+process-backed Codex adapters. The process-backed adapter requires explicit
+local CLI command configuration and uses a real process runner for stdout,
+stderr, streaming events, working directory, timeout, and structured result
+handling. Runtime CLI behavior is still pending.
 
 ## Non-Goals
 
