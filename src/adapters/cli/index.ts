@@ -17,6 +17,7 @@ import { createDefaultScoutArchitectureFakeRunner } from "../codex/index.js";
 import {
   NodeAgentOutputArtifactWriter,
   NodeAgentOutputSchemaReader,
+  NodeCaseStudyDocumentWriter,
   NodeEvidenceValidationReportWriter,
   NodeQaArtifactWriter,
   NodePromptArtifactWriter,
@@ -105,6 +106,7 @@ export async function runInspectorCli(
       validationReports: new NodeValidationReportWriter(),
       evidenceReports: new NodeEvidenceValidationReportWriter(),
       qaArtifacts: new NodeQaArtifactWriter(),
+      finalDocs: new NodeCaseStudyDocumentWriter(),
       validators: await createSchemaContractValidators(),
       schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
       progress: (message) => printProgress(stdout, command.verbose, message),

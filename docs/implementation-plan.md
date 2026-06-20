@@ -26,9 +26,10 @@ contract-first baseline:
 - TypeScript domain contract interfaces in `src/domain/types.ts`.
 - Package scripts for tests, type checking, build, and aggregate validation.
 
-Runtime CLI implementation has started with a Scout-only `inspector run`
-vertical slice. Full multi-agent orchestration services, real Codex runner
-configuration, QA routing, and final writer adapters are still pending.
+Runtime CLI implementation has started with a Scout, Architecture, Pattern
+Miner, QA, and final case-study documentation `inspector run` vertical slice.
+Full scheduler-driven orchestration services, real Codex runner configuration,
+RAG-card generation, and inspection-report writers are still pending.
 Filesystem adapters now exist for auditable run workspace creation,
 deterministic repository indexing, append-only run memory, prompt template
 loading, and prompt artifact writing. Runner ports now exist with deterministic
@@ -41,7 +42,10 @@ reports to the run workspace. Scout now has a structured output contract for
 repository mapping and candidate findings. Evidence validation now checks cited
 files, line ranges, repository-contained paths, high-confidence finding
 evidence, QA finding references, and knowledge-card approved-finding
-references.
+references. Final case-study documentation now writes the fixed Markdown
+package under `final/docs/` from QA-approved findings only, excludes rejected
+findings, and marks unsupported sections with explicit insufficient-evidence
+language.
 
 ## Fixed Milestones
 
@@ -1078,4 +1082,51 @@ git status
 
 ```bash
 feat(orchestrator): route QA failures to owner agents
+```
+
+### Milestone 24: Final Reviewer and Case Study Writer
+
+#### Goal
+
+Generate final case-study docs from approved findings only.
+
+#### Tasks
+
+- Added a `CaseStudyDocumentWriter` port and filesystem adapter that writes
+  Markdown under `final/docs/`.
+- Added `generateCaseStudyDocumentation` in the application layer with the
+  fixed ten-document output package: `00-executive-summary.md`,
+  `01-product-context.md`, `02-architecture-map.md`,
+  `03-feature-flow-traces.md`, `04-pattern-catalog.md`,
+  `05-testing-strategy.md`, `06-tradeoffs-and-risks.md`,
+  `07-adaptation-blueprint.md`, `08-implementation-plan.md`, and
+  `09-verification-report.md`.
+- Generated final docs from QA-approved findings only and excluded rejected
+  findings from case-study content and the verification evidence chain.
+- Marked unsupported sections with explicit insufficient-evidence language.
+- Preserved evidence chains by rendering finding ids, QA result ids, source
+  file paths, and line ranges in generated documents.
+- Wired final documentation generation into the current
+  Scout/Architecture/Pattern Miner plus QA runtime use case after final QA.
+
+#### TDD
+
+Added integration tests for final document generation, approved finding
+inclusion, rejected finding exclusion, honest unsupported sections, verification
+report evidence chains, and CLI runtime final-doc output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(writers): generate verified case study documentation
 ```

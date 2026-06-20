@@ -89,8 +89,10 @@ Application responsibilities include:
   explain malformed JSON and schema failures.
 - Creating revision requests for failed QA and routing them to the responsible
   agent or follow-up agent.
-- Assembling final report and knowledge-card write requests after validation
-  succeeds.
+- Assembling final case-study documentation from QA-approved findings only
+  after validation and QA complete.
+- Preserving explicit insufficient-evidence language for final sections that do
+  not have approved findings.
 
 ## Adapters
 
@@ -101,8 +103,8 @@ Adapter responsibilities include:
 - CLI adapters parse arguments, handle user-visible errors, and call application
   use cases.
 - The CLI `run` adapter validates local repository and objective paths, wires
-  concrete filesystem, memory, validation, prompt, schema, QA artifact, and
-  runner adapters, prints user-visible progress, and calls the
+  concrete filesystem, memory, validation, prompt, schema, QA artifact, final
+  document writer, and runner adapters, prints user-visible progress, and calls the
   Scout/Architecture/Pattern Miner plus QA application use case.
 - The current Scout/Architecture/Pattern Miner application use case creates the
   run workspace, indexes the repository, initializes memory, builds auditable
@@ -112,10 +114,12 @@ Adapter responsibilities include:
   runs deterministic QA verification. QA revision requests are grouped by owner
   agent, routed only to that owner as the next attempt, revalidated against the
   owner schema and evidence rules, and followed by final QA so unresolved issues
-  remain visible in QA artifacts when retries are exhausted. Shared application
-  step logic handles prompt construction, runner execution, output persistence,
-  and schema validation for these agents. It remains a linear early runtime
-  slice until the full scheduler-driven orchestration flow is wired.
+  remain visible in QA artifacts when retries are exhausted. The use case then
+  writes the fixed `final/docs/` case-study Markdown package from the final
+  approved findings. Shared application step logic handles prompt construction,
+  runner execution, output persistence, and schema validation for these agents.
+  It remains a linear early runtime slice until the full scheduler-driven
+  orchestration flow is wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
@@ -168,6 +172,7 @@ Expected ports include:
 - `ValidationReportWriter` for saving parse and schema validation reports.
 - `QaArtifactWriter` for saving deterministic QA result, issue, revision
   request, and readiness artifacts.
+- `CaseStudyDocumentWriter` for saving fixed final case-study Markdown files.
 - `EvidenceValidator` for deterministic file, line-range, and cross-artifact
   evidence-reference checks before semantic QA.
 - `ArtifactValidator` for schema-backed runtime artifact checks used before
@@ -275,9 +280,11 @@ issues and revision requests in artifacts when the retry limit is reached.
 
 ## Final Outputs
 
-The final case-study documentation should summarize the inspected repository,
-important findings, evidence, QA status, validation commands, and decisions in a
-reviewable Markdown format.
+The final case-study documentation is written under `final/docs/` as a fixed
+ten-file Markdown package. It may use approved findings only, must exclude
+rejected findings, must preserve finding and QA evidence chains, and must state
+that there is not enough verified evidence when a section has no approved
+support.
 
 RAG-ready knowledge cards should be compact, evidence-linked JSON artifacts for
 future coding agents. They must preserve references back to validated findings

@@ -5,6 +5,7 @@ import type {
   AgentOutputArtifactWriter,
   AgentOutputSchemaReader,
   AgentStatusArtifactWriter,
+  CaseStudyDocumentWriter,
   EvidenceValidationReportWriter,
   PromptArtifactWriter,
   PromptTemplateReader,
@@ -319,6 +320,22 @@ export class NodeQaArtifactWriter implements QaArtifactWriter {
 
     await mkdir(workspace.folders.qa, { recursive: true });
     await writeFile(path, content);
+
+    return { path };
+  }
+}
+
+export class NodeCaseStudyDocumentWriter implements CaseStudyDocumentWriter {
+  async writeCaseStudyDocument(request: {
+    workspace: RunWorkspace;
+    path: string;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(request.workspace.folders.final, "docs");
+    const path = join(directory, request.path);
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
 
     return { path };
   }

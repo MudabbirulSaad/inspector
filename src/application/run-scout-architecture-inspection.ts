@@ -12,6 +12,7 @@ import type {
   AgentOutputArtifactWriter,
   AgentOutputSchemaReader,
   AgentRunner,
+  CaseStudyDocumentWriter,
   Clock,
   EvidenceValidationReportWriter,
   PromptArtifactWriter,
@@ -37,6 +38,7 @@ import {
 import { buildAgentPrompt } from "./build-agent-prompt.js";
 import { createInspectionRunWorkspace } from "./create-inspection-run-workspace.js";
 import { executeAgentRun } from "./execute-agent-run.js";
+import { generateCaseStudyDocumentation } from "./generate-case-study-documentation.js";
 import { indexTargetRepository } from "./index-target-repository.js";
 import { validateAgentOutput } from "./validate-agent-output.js";
 import {
@@ -66,6 +68,7 @@ export interface RunScoutArchitectureInspectionInput {
   validationReports: ValidationReportWriter;
   evidenceReports: EvidenceValidationReportWriter;
   qaArtifacts: QaArtifactWriter;
+  finalDocs: CaseStudyDocumentWriter;
   validators: SchemaContractValidators;
   schemaReader: AgentOutputSchemaReader;
   progress?: (message: string) => void;
@@ -338,6 +341,19 @@ export async function runScoutArchitectureInspection(
       validator: input.validators.finding,
     });
   }
+
+  input.progress?.("Writing final case-study documentation");
+  await generateCaseStudyDocumentation({
+    workspace,
+    writer: input.finalDocs,
+    repository: input.config.target,
+    objective: input.objective,
+    approvedFindings: qa.approvedFindings,
+    rejectedFindings: qa.rejectedFindings,
+    qaResults: qa.qaResults,
+    generatedAt: input.clock.now(),
+  });
+
   return { workspace };
 }
 

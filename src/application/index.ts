@@ -13,6 +13,7 @@ export * from "./validate-agent-output.js";
 export * from "./validate-evidence-references.js";
 export * from "./run-scout-architecture-inspection.js";
 export * from "./verify-findings-with-qa.js";
+export * from "./generate-case-study-documentation.js";
 
 export const applicationBoundary = "application" as const;
 

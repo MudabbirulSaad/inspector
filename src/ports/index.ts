@@ -144,6 +144,18 @@ export interface QaArtifactWriter {
   }): Promise<{ path: string }>;
 }
 
+export interface CaseStudyDocumentWriteRequest {
+  workspace: RunWorkspace;
+  path: string;
+  content: string;
+}
+
+export interface CaseStudyDocumentWriter {
+  writeCaseStudyDocument(
+    request: CaseStudyDocumentWriteRequest,
+  ): Promise<{ path: string }>;
+}
+
 export interface AgentOutputSchemaReader {
   readAgentOutputSchema(contract: string): Promise<unknown>;
 }

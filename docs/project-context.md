@@ -70,8 +70,11 @@ evidence-valid outputs, runs QA, and routes QA revision requests back only to
 the owning agent. Owner retries preserve prior attempts, include the previous
 output and QA issue in the repair prompt, revalidate schema and evidence, update
 memory, rerun QA, and leave unresolved final revision requests visible when the
-retry policy is exhausted. Full scheduler-driven multi-agent orchestration is
-still pending.
+retry policy is exhausted. The final case-study writer now emits the fixed
+`final/docs/` Markdown package from QA-approved findings only, excludes rejected
+findings, preserves file and line evidence chains, and marks unsupported
+sections with insufficient-evidence language. Full scheduler-driven multi-agent
+orchestration is still pending.
 
 ## Non-Goals
 

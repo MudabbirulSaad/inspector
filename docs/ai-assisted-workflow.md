@@ -56,6 +56,9 @@ Validation commands gate progress. A milestone is not complete because text was 
 
 Public documentation should describe deliberate AI-assisted engineering practice: clear constraints, human review, evidence-backed outputs, repeatable validation, and maintainable architecture.
 
-Final case-study documentation and RAG-ready knowledge cards must include only
-validated, evidence-backed material. Reports should preserve validation metadata
-and QA status so reviewers and future agents can trace every claim.
+Final case-study documentation must include only QA-approved findings, exclude
+rejected findings, preserve file and line evidence chains, and say when there is
+not enough verified evidence for a section. RAG-ready knowledge cards must also
+include only validated, evidence-backed material. Reports should preserve
+validation metadata and QA status so reviewers and future agents can trace every
+claim.

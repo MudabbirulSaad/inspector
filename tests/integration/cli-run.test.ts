@@ -621,6 +621,20 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       .length,
     3,
   );
+  assert.match(
+    await readFile(
+      join(workspaceRoot, "final", "docs", "00-executive-summary.md"),
+      "utf8",
+    ),
+    /The repository includes a README entrypoint/,
+  );
+  assert.match(
+    await readFile(
+      join(workspaceRoot, "final", "docs", "09-verification-report.md"),
+      "utf8",
+    ),
+    /Approved findings used: 3/,
+  );
 });
 
 test("CLI run routes QA revisions only to the owner agent and preserves attempts", async () => {
