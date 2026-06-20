@@ -72,6 +72,36 @@ test("creates an auditable inspection run workspace", async () => {
   }
 });
 
+test("falls back to a repository slug when target name has no slug characters", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "inspector-run-"));
+  const outputDirectory = join(tempDirectory, ".inspector-runs");
+  const config = {
+    ...createRunConfig(outputDirectory),
+    target: {
+      name: "!!!",
+      root: "./punctuation-repository",
+      commit: "abc1234",
+    },
+  };
+
+  const workspace = await createInspectionRunWorkspace({
+    config,
+    clock: fixedClock,
+    workspaces: new NodeRunWorkspaceStore(),
+  });
+
+  assert.equal(workspace.name, "2026-06-20T01-02-03-004Z_repository");
+
+  const configJson = JSON.parse(
+    await readFile(join(workspace.root, "config.json"), "utf8"),
+  ) as RunConfig;
+  assert.deepEqual(configJson, config);
+
+  for (const folder of expectedFolders) {
+    assert.equal((await stat(join(workspace.root, folder))).isDirectory(), true);
+  }
+});
+
 test("creates a unique workspace when the timestamped folder already exists", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "inspector-run-"));
   const outputDirectory = join(tempDirectory, ".inspector-runs");
