@@ -12,6 +12,7 @@ import type {
   TestingStrategyOutput,
   TradeoffAnalystOutput,
 } from "../domain/types.js";
+import type { QualityCommandReport, QualityCommandResult } from "./run-quality-commands.js";
 
 export type AgentOutputValidationStatus =
   | "passed"
@@ -42,6 +43,7 @@ export interface ValidateAgentOutputRequest {
   rawOutput: string;
   validators: SchemaContractValidators;
   reports: ValidationReportWriter;
+  qualityCommandReport?: QualityCommandReport;
 }
 
 export interface ValidateAgentOutputResult {
@@ -82,7 +84,11 @@ export async function validateAgentOutput(
     });
   }
 
-  const claimErrors = validateContractClaims(contract, schemaResult.value);
+  const claimErrors = validateContractClaims(
+    contract,
+    schemaResult.value,
+    request.qualityCommandReport,
+  );
   if (claimErrors.length > 0) {
     return writeResult(request, {
       contract,
@@ -105,6 +111,7 @@ export async function validateAgentOutput(
 function validateContractClaims(
   contract: AgentOutputContract,
   value: unknown,
+  qualityCommandReport: QualityCommandReport | undefined,
 ): AgentOutputValidationReportError[] {
   if (contract !== "testing-strategy-output") {
     if (contract === "tradeoff-analyst-output") {
@@ -120,17 +127,128 @@ function validateContractClaims(
       .map((command) => command.command),
   );
 
-  return output.qualityGates
+  return [
+    ...output.qualityGates
     .filter(
       (gate) => gate.status === "passed" && !passedCommands.has(gate.command),
     )
     .map((gate) => ({
-      type: "schema-violation",
+      type: "schema-violation" as const,
       contract,
       path: "/qualityGates",
       keyword: "commandEvidence",
       message: `Testing Strategy output claims ${gate.command} passed without passed command evidence`,
-    }));
+    })),
+    ...validateTestingStrategyCommandReportClaims(
+      contract,
+      output,
+      qualityCommandReport,
+    ),
+  ];
+}
+
+function validateTestingStrategyCommandReportClaims(
+  contract: AgentOutputContract,
+  output: TestingStrategyOutput,
+  report: QualityCommandReport | undefined,
+): AgentOutputValidationReportError[] {
+  if (report === undefined) {
+    return [];
+  }
+
+  const claims = [
+    ...output.qualityGates.map((gate) => ({
+      command: gate.command,
+      status: gate.status,
+      path: "/qualityGates",
+    })),
+    ...output.commandEvidence.map((command) => ({
+      command: command.command,
+      status: command.status,
+      path: "/commandEvidence",
+    })),
+  ];
+
+  if (report.skipped === true) {
+    return claims
+      .filter((claim) => claim.status === "passed" || claim.status === "failed")
+      .map((claim) => ({
+        type: "schema-violation" as const,
+        contract,
+        path: claim.path,
+        keyword: "qualityCommandReport",
+        message: `Testing Strategy output claims ${claim.command} ${claim.status}, but the quality command report was skipped`,
+      }));
+  }
+
+  const commandReport = new Map(
+    report.commands.map((command) => [qualityCommandText(command), command]),
+  );
+
+  return claims.flatMap((claim) => {
+    const command = commandReport.get(claim.command);
+
+    if (claim.status === "not-run") {
+      if (command === undefined) {
+        return [];
+      }
+      return [
+        {
+          type: "schema-violation" as const,
+          contract,
+          path: claim.path,
+          keyword: "qualityCommandReport",
+          message: `Testing Strategy output claims ${claim.command} was not run, but this contradicts executed command report entry`,
+        },
+      ];
+    }
+
+    if (command === undefined) {
+      return [
+        {
+          type: "schema-violation" as const,
+          contract,
+          path: claim.path,
+          keyword: "qualityCommandReport",
+          message: `Testing Strategy output claims ${claim.command} ${claim.status}, but there is no matching quality command report entry`,
+        },
+      ];
+    }
+
+    if (claim.status === "passed" && command.status !== "passed") {
+      return [
+        {
+          type: "schema-violation" as const,
+          contract,
+          path: claim.path,
+          keyword: "qualityCommandReport",
+          message: `Testing Strategy output claims ${claim.command} passed, but the quality command report status is ${command.status}`,
+        },
+      ];
+    }
+
+    if (
+      claim.status === "failed" &&
+      command.status !== "failed" &&
+      command.status !== "timeout"
+    ) {
+      return [
+        {
+          type: "schema-violation" as const,
+          contract,
+          path: claim.path,
+          keyword: "qualityCommandReport",
+          message: `Testing Strategy output claims ${claim.command} failed, but the quality command report status is ${command.status}`,
+        },
+      ];
+    }
+
+    return [];
+  });
+}
+
+function qualityCommandText(command: QualityCommandResult): string {
+  return [command.command, ...command.args].join(" ");
 }
 
 function validateTradeoffAnalystClaims(

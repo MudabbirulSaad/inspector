@@ -63,6 +63,19 @@ emits only production source from `src/` to `dist/`.
 
 CLI tests should exercise user-visible behavior: accepted arguments, invalid target paths, verbose streaming, output locations, and failure messages. Avoid testing internal parser details unless they are exposed behavior.
 
+Runtime CLI tests cover trusted quality-command execution explicitly:
+quality commands are skipped by default with a skipped command report, and
+`--run-quality-commands` or `runQualityCommands: true` is required before the
+process runner is invoked. Config tests also assert that custom `agents` lists
+and `parallelism > 1` fail clearly until scheduler-driven orchestration is
+wired into `inspector run`.
+
+E2E fake-run tests assert every specialist attempt writes
+`agents/<agent-id>/attempt-<n>/status.json`. Agent output validation tests check
+Testing Strategy command evidence against the actual quality command report,
+including skipped, passed, failed, timeout-compatible, not-run, and missing
+report-entry cases.
+
 ## Determinism
 
 Tests should avoid real network calls, live AI invocations, wall-clock dependencies, and uncontrolled filesystem state. Use fixtures and adapter fakes for repeatability.

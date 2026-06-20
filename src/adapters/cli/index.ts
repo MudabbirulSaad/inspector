@@ -10,6 +10,7 @@ import type { RunConfig } from "../../domain/types.js";
 import type {
   AgentRunner,
   Clock,
+  ProcessRunner,
   RunWorkspace,
 } from "../../ports/index.js";
 import { createSchemaContractValidators } from "../../validation/index.js";
@@ -20,6 +21,7 @@ import {
 import {
   NodeAgentOutputArtifactWriter,
   NodeAgentOutputSchemaReader,
+  NodeAgentStatusArtifactWriter,
   NodeCaseStudyDocumentWriter,
   NodeEvidenceValidationReportWriter,
   NodeQaArtifactWriter,
@@ -42,6 +44,7 @@ export interface InspectorCliRequest {
   argv: string[];
   clock?: Clock;
   runner?: AgentRunner;
+  processRunner?: ProcessRunner;
   stdout?: (line: string) => void;
   stderr?: (line: string) => void;
 }
@@ -61,6 +64,7 @@ interface ParsedRunCommand {
   agents?: string[];
   parallelism?: number;
   maxRetries?: number;
+  runQualityCommands: boolean;
   runner?: InspectionConfigRunner;
 }
 
@@ -80,6 +84,7 @@ interface InspectionConfigFile {
   agents?: string[];
   parallelism?: number;
   maxRetries?: number;
+  runQualityCommands?: boolean;
   verbose?: boolean;
   runner?: InspectionConfigRunner;
 }
@@ -107,7 +112,7 @@ export async function runInspectorCli(
     const repoRoot = resolve(command.repoPath);
     const repositoryReader = new NodeRepositoryReader(repoRoot);
     const repositoryEntries = await repositoryReader.listEntries();
-    const processRunner = new NodeProcessRunner();
+    const processRunner = request.processRunner ?? new NodeProcessRunner();
     const config: RunConfig = {
       target: {
         name: basename(repoRoot),
@@ -125,6 +130,7 @@ export async function runInspectorCli(
         ? {}
         : { parallelism: command.parallelism }),
       ...(command.maxRetries === undefined ? {} : { maxRetries: command.maxRetries }),
+      runQualityCommands: command.runQualityCommands,
       ...(command.runner === undefined ? {} : { runner: command.runner }),
     };
 
@@ -143,6 +149,7 @@ export async function runInspectorCli(
       memory: (workspace) => new NodeSwarmMemoryStore(workspace),
       promptTemplates: new NodePromptTemplateReader(promptRoot),
       promptArtifacts: new NodePromptArtifactWriter(),
+      statusArtifacts: new NodeAgentStatusArtifactWriter(),
       outputArtifacts: new NodeAgentOutputArtifactWriter(),
       validationReports: new NodeValidationReportWriter(),
       evidenceReports: new NodeEvidenceValidationReportWriter(),
@@ -204,6 +211,7 @@ async function parseRunCommand(argv: string[]): Promise<ParsedRunCommand> {
     outPath,
     verbose: argv.includes("--verbose"),
     debug: argv.includes("--debug"),
+    runQualityCommands: argv.includes("--run-quality-commands"),
   };
 }
 
@@ -242,6 +250,8 @@ async function parseConfigRunCommand(
     agents: config.agents,
     parallelism: config.parallelism,
     maxRetries: config.maxRetries,
+    runQualityCommands:
+      argv.includes("--run-quality-commands") || config.runQualityCommands === true,
     runner: config.runner,
   };
 }
@@ -338,6 +348,7 @@ function isKnownConfigKey(key: string): boolean {
     "agents",
     "parallelism",
     "maxRetries",
+    "runQualityCommands",
     "verbose",
     "runner",
   ].includes(key);
@@ -403,6 +414,10 @@ function normalizeInspectionConfig(config: Record<string, unknown>): InspectionC
     agents: optionalStringArray(config.agents, "agents"),
     parallelism: optionalNonNegativeInteger(config.parallelism, "parallelism", 1),
     maxRetries: optionalNonNegativeInteger(config.maxRetries, "maxRetries", 0),
+    runQualityCommands: optionalBoolean(
+      config.runQualityCommands,
+      "runQualityCommands",
+    ),
     verbose: optionalBoolean(config.verbose, "verbose"),
     runner: optionalRunner(config.runner),
   };

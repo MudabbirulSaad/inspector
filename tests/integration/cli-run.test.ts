@@ -7,7 +7,13 @@ import test from "node:test";
 
 import { FakeAgentRunner } from "../../src/adapters/codex/index.js";
 import { runInspectorCli } from "../../src/adapters/cli/index.js";
-import type { AgentRunResult, Clock } from "../../src/index.js";
+import type {
+  AgentRunResult,
+  Clock,
+  ProcessRunRequest,
+  ProcessRunResult,
+  ProcessRunner,
+} from "../../src/index.js";
 
 const fixedClock: Clock = {
   now: () => new Date("2026-06-20T01:02:03.004Z"),
@@ -501,6 +507,55 @@ function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
   });
 }
 
+function successfulRunnerWithPassedCommandEvidence(): FakeAgentRunner {
+  const trustedTestingStrategyOutput = {
+    ...testingStrategyOutput,
+    qualityGates: [
+      {
+        ...testingStrategyOutput.qualityGates[0],
+        status: "passed",
+        summary: "The configured test command passed in the quality command report.",
+      },
+    ],
+    commandEvidence: [
+      {
+        command: "npm test",
+        status: "passed",
+        exitCode: 0,
+        ranAt: "2026-06-20T01:02:03.004Z",
+        evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      },
+    ],
+  };
+
+  return new FakeAgentRunner({
+    results: [
+      successfulScoutResult(),
+      successfulArchitectureResult(),
+      successfulPatternMinerResult(),
+      successfulFlowTracerResult(),
+      successfulTestingStrategyResult(JSON.stringify(trustedTestingStrategyOutput)),
+      successfulTradeoffAnalystResult(),
+    ],
+  });
+}
+
+class RecordingProcessRunner implements ProcessRunner {
+  readonly requests: ProcessRunRequest[] = [];
+
+  async run(request: ProcessRunRequest): Promise<ProcessRunResult> {
+    this.requests.push(request);
+    return {
+      stdout: "quality passed\n",
+      stderr: "",
+      exitCode: 0,
+      startedAt: "2026-06-20T01:02:03.000Z",
+      completedAt: "2026-06-20T01:02:04.000Z",
+      streamingEvents: [],
+    };
+  }
+}
+
 async function createFixture(): Promise<{
   tempDirectory: string;
   repoPath: string;
@@ -514,6 +569,10 @@ async function createFixture(): Promise<{
 
   await mkdir(repoPath);
   await writeFile(join(repoPath, "README.md"), "# Target\n\nContext.\n");
+  await writeFile(
+    join(repoPath, "package.json"),
+    `${JSON.stringify({ scripts: { test: "echo test" } }, null, 2)}\n`,
+  );
   await writeFile(objectivePath, "Inspect the repository structure.\n");
 
   return { tempDirectory, repoPath, objectivePath, outPath };
@@ -551,7 +610,80 @@ test("CLI run creates a run workspace for a valid command", async () => {
       ),
       "utf8",
     ),
-    ".\nREADME.md\n",
+    ".\nREADME.md\npackage.json\n",
+  );
+});
+
+test("CLI run writes a skipped command report by default without invoking the process runner", async () => {
+  const fixture = await createFixture();
+  const processRunner = new RecordingProcessRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    processRunner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(processRunner.requests, []);
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(
+          fixture.outPath,
+          "2026-06-20T01-02-03-004Z_target-repo",
+          "validation",
+          "command_report.json",
+        ),
+        "utf8",
+      ),
+    ),
+    {
+      skipped: true,
+      reason:
+        "Quality command execution is disabled by default. Use --run-quality-commands or runQualityCommands: true only for trusted repositories.",
+      commands: [],
+    },
+  );
+});
+
+test("CLI run executes detected safe commands with --run-quality-commands", async () => {
+  const fixture = await createFixture();
+  const processRunner = new RecordingProcessRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+      "--run-quality-commands",
+    ],
+    clock: fixedClock,
+    runner: successfulRunnerWithPassedCommandEvidence(),
+    processRunner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(
+    processRunner.requests.map((request) => ({
+      command: request.command,
+      args: request.args,
+      cwd: request.cwd,
+    })),
+    [{ command: "npm", args: ["test"], cwd: fixture.repoPath }],
   );
 });
 
@@ -569,7 +701,11 @@ test("CLI run accepts a declarative inspection config file", async () => {
       "agents:",
       "  - scout",
       "  - architecture",
-      "parallelism: 2",
+      "  - pattern_miner",
+      "  - flow_tracer",
+      "  - testing_strategy",
+      "  - tradeoff_analyst",
+      "parallelism: 1",
       "maxRetries: 3",
       "verbose: true",
       "runner:",
@@ -611,10 +747,134 @@ test("CLI run accepts a declarative inspection config file", async () => {
     runner?: { provider?: string };
   };
   assert.equal(savedConfig.targetContext, "Focus on CLI configuration ergonomics.");
-  assert.deepEqual(savedConfig.agents, ["scout", "architecture"]);
-  assert.equal(savedConfig.parallelism, 2);
+  assert.deepEqual(savedConfig.agents, [
+    "scout",
+    "architecture",
+    "pattern_miner",
+    "flow_tracer",
+    "testing_strategy",
+    "tradeoff_analyst",
+  ]);
+  assert.equal(savedConfig.parallelism, 1);
   assert.equal(savedConfig.maxRetries, 3);
   assert.deepEqual(savedConfig.runner, { provider: "fake" });
+});
+
+test("CLI config run rejects parallelism greater than one before scheduler runtime wiring", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const stderr: string[] = [];
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect unsupported parallelism.",
+      "parallelism: 2",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunnerWithPassedCommandEvidence(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /parallelism > 1 is reserved for scheduler-driven orchestration and is not active before Milestone 34\+/,
+  );
+});
+
+test("CLI config run rejects partial custom agent selection before scheduler runtime wiring", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const stderr: string[] = [];
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect unsupported agent selection.",
+      "agents:",
+      "  - scout",
+      "  - architecture",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunnerWithPassedCommandEvidence(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /custom agent selection is reserved for scheduler-driven orchestration and is not active in the current runtime slice/,
+  );
+});
+
+test("CLI config run executes detected safe commands when runQualityCommands is true", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const processRunner = new RecordingProcessRunner();
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect trusted config command execution.",
+      "runQualityCommands: true",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunnerWithPassedCommandEvidence(),
+    processRunner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(processRunner.requests.map((request) => request.command), [
+    "npm",
+  ]);
+});
+
+test("CLI config run skips command execution when runQualityCommands is omitted", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const processRunner = new RecordingProcessRunner();
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect default config command behavior.",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    processRunner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(processRunner.requests, []);
 });
 
 test("CLI run reports invalid inspection config values clearly", async () => {
@@ -1181,7 +1441,12 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
         "utf8",
       ),
     ),
-    { commands: [] },
+    {
+      skipped: true,
+      reason:
+        "Quality command execution is disabled by default. Use --run-quality-commands or runQualityCommands: true only for trusted repositories.",
+      commands: [],
+    },
   );
   assert.match(
     await readFile(
@@ -1556,6 +1821,23 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
     await readFile(join(workspaceRoot, "memory", "qa_issues.jsonl"), "utf8"),
     /finding-architecture-does-not-use-ports/,
   );
+  const retryStatus = JSON.parse(
+    await readFile(
+      join(workspaceRoot, "agents", "architecture", "attempt-2", "status.json"),
+      "utf8",
+    ),
+  ) as { status?: string; history?: Array<{ to?: string }> };
+  assert.equal(retryStatus.status, "EVIDENCE_VALIDATED");
+  assert.deepEqual(
+    retryStatus.history?.map((transition) => transition.to),
+    [
+      "PENDING",
+      "RUNNING",
+      "OUTPUT_RECEIVED",
+      "SCHEMA_VALIDATED",
+      "EVIDENCE_VALIDATED",
+    ],
+  );
 });
 
 test("CLI run respects max retries and leaves unresolved QA issues visible", async () => {
@@ -1765,6 +2047,7 @@ test("CLI run prints professional verbose inspection progress", async () => {
   assert.match(output, /QA verification passed: 6 approved, 0 rejected/);
   assert.match(output, /Final output: .*final\/docs/);
   assert.match(output, /Inspection run workspace:/);
+
 });
 
 test("CLI run fails when Scout output is not schema-valid", async () => {
@@ -1792,6 +2075,21 @@ test("CLI run fails when Scout output is not schema-valid", async () => {
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Scout schema validation failed/);
+  assert.ok(result.workspace);
+  const status = JSON.parse(
+    await readFile(
+      join(result.workspace.root, "agents", "scout", "attempt-1", "status.json"),
+      "utf8",
+    ),
+  ) as { status?: string; history?: Array<{ to?: string }> };
+  assert.equal(status.status, "FAILED");
+  assert.deepEqual(status.history?.map((transition) => transition.to), [
+    "PENDING",
+    "RUNNING",
+    "OUTPUT_RECEIVED",
+    "SCHEMA_FAILED",
+    "FAILED",
+  ]);
 });
 
 test("CLI run reports useful failures without stack traces by default", async () => {
@@ -1887,6 +2185,22 @@ test("CLI run fails when Scout evidence cites missing repository lines", async (
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Scout evidence validation failed/);
+  assert.ok(result.workspace);
+  const status = JSON.parse(
+    await readFile(
+      join(result.workspace.root, "agents", "scout", "attempt-1", "status.json"),
+      "utf8",
+    ),
+  ) as { status?: string; history?: Array<{ to?: string }> };
+  assert.equal(status.status, "FAILED");
+  assert.deepEqual(status.history?.map((transition) => transition.to), [
+    "PENDING",
+    "RUNNING",
+    "OUTPUT_RECEIVED",
+    "SCHEMA_VALIDATED",
+    "EVIDENCE_FAILED",
+    "FAILED",
+  ]);
 });
 
 test("CLI run fails when Architecture output is not schema-valid", async () => {

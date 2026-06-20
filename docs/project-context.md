@@ -46,13 +46,15 @@ handling. Safe validation command execution is now guarded by an application
 allowlist that accepts only known test/typecheck/lint/build/pytest commands,
 parses commands into structured executable and argument arrays, rejects unknown
 commands by default, and blocks shell syntax before delegating to a process
-runner. Runtime inspection runs now execute detected safe quality commands for
-test, typecheck, lint, and build through the process port and write
-`validation/command_report.json` with command arguments, exit code, stdout,
-stderr, duration, and passed/failed/blocked/timeout status. Agent lifecycle
-state is now modeled as an auditable state machine with attempt tracking,
-deterministic status serialization, and filesystem status artifacts under each
-agent attempt folder. The application layer now
+runner. Runtime inspection runs do not execute detected quality commands by
+default; trusted runs may opt in with `--run-quality-commands` or
+`runQualityCommands: true`. Every run still writes
+`validation/command_report.json`, either with a skipped reason or with command
+arguments, exit code, stdout, stderr, duration, and
+passed/failed/blocked/timeout status. Agent lifecycle state is now modeled as
+an auditable state machine with attempt tracking, deterministic status
+serialization, and runtime status artifacts under
+`agents/<agent-id>/attempt-<n>/status.json`. The application layer now
 includes a dependency-aware agent scheduler that runs ready agents in
 deterministic order, executes independent agents in parallel up to a configured
 limit, blocks dependents of failed required agents, and allows continuation
@@ -70,8 +72,12 @@ computes a deterministic readiness score. The runtime CLI slice now parses
 direct `inspector run <repo-path> --objective <file> --out <path>` commands and
 declarative `inspector run inspection.yaml` config files. Config files support
 repository path, output path, inline objective, target context, selected agents,
-parallelism, max retries, verbosity, and runner configuration, with CLI flags
-overriding config values where they apply. The CLI validates repository and
+parallelism, max retries, trusted quality-command execution, verbosity, and
+runner configuration, with CLI flags overriding config values where they apply.
+The current runtime accepts omitted `agents`/`parallelism`, `parallelism: 1`,
+or the exact implemented specialist sequence only; custom selection and
+`parallelism > 1` fail clearly until scheduler-driven orchestration is wired
+into the user-facing runtime. The CLI validates repository and
 objective inputs, wires concrete adapters, prints progress, and calls a
 Scout/Architecture/Pattern Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst plus QA
 application use case. Verbose mode now streams professional progress for run
@@ -91,7 +97,8 @@ one to three verified feature flows or explicit insufficient-evidence records.
 Testing Strategy uses a dedicated `testing-strategy-output` contract for test
 types found, quality gates, protected behavior, unprotected behavior, command
 evidence, testing risks, recommendations, and candidate findings; it marks
-commands as `not-run` unless command evidence proves they ran.
+commands as `not-run` unless command evidence proves they ran, and runtime
+validation checks command claims against the actual quality command report.
 Tradeoff Analyst uses a dedicated `tradeoff-analyst-output` contract for strong
 decisions, weak decisions, overengineering risks, underengineering risks, hidden
 assumptions, agent-safety risks, adaptation warnings, and candidate findings.

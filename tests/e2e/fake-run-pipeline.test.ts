@@ -109,6 +109,15 @@ async function assertRunWorkspaceArtifacts(
   ]) {
     await assertFile(join(workspaceRoot, "agents", agentId, "attempt-1", "prompt.md"));
     await assertFile(join(workspaceRoot, "agents", agentId, "attempt-1", "output.json"));
+    const status = await assertJsonFile(
+      join(workspaceRoot, "agents", agentId, "attempt-1", "status.json"),
+    );
+    assertRecord(status);
+    assert.equal(status.status, "EVIDENCE_VALIDATED");
+    assert.ok(
+      JSON.stringify(status).includes("EVIDENCE_VALIDATED"),
+      `${agentId} status should include EVIDENCE_VALIDATED`,
+    );
     await assertJsonFile(
       join(workspaceRoot, "validation", agentId, "attempt-1", "report.json"),
     );
@@ -127,13 +136,9 @@ async function assertRunWorkspaceArtifacts(
     join(workspaceRoot, "validation", "command_report.json"),
   );
   assertRecord(commandReport);
+  assert.equal(commandReport.skipped, true);
   assert.ok(Array.isArray(commandReport.commands));
-  assert.ok(commandReport.commands.length > 0);
-  assert.ok(
-    commandReport.commands.every(
-      (command: { status?: string }) => command.status === "passed",
-    ),
-  );
+  assert.equal(commandReport.commands.length, 0);
 
   const qaResults = await assertJsonFile(join(workspaceRoot, "qa", "results.json"));
   const qaIssues = await assertJsonFile(join(workspaceRoot, "qa", "issues.json"));

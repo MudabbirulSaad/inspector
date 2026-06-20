@@ -122,9 +122,11 @@ Adapter responsibilities include:
   writes the fixed `final/docs/` case-study Markdown package and
   `final/rag_cards/` JSONL package from the final approved findings. Shared
   application step logic handles prompt construction, runner execution, output
-  persistence, and schema validation for these agents. It remains a linear
-  early runtime slice until the full scheduler-driven orchestration flow is
-  wired.
+  persistence, schema validation, and lifecycle status through schema
+  validation for these agents. Specialist output mapping and QA revision
+  routing live in focused application modules so the high-level runtime
+  orchestrator remains the coordination layer. It remains a linear early
+  runtime slice until the full scheduler-driven orchestration flow is wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
@@ -141,10 +143,13 @@ Adapter responsibilities include:
   validation commands, parses them into executable plus argument arrays, rejects
   unknown commands by default, and reports shell syntax such as command
   chaining, pipes, redirection, and command substitution as unsafe.
-- Quality command execution runs only detected safe test, typecheck, lint, and
-  build commands through the process port, records blocked commands without
-  executing them, distinguishes timeout results, and writes the deterministic
-  `validation/command_report.json` artifact under the run workspace.
+- Quality command execution is disabled by default. Trusted repositories may
+  opt in with `--run-quality-commands` or `runQualityCommands: true`; disabled
+  runs still write a deterministic skipped `validation/command_report.json`.
+  Enabled runs execute only detected safe test, typecheck, lint, and build
+  commands through the process port, record blocked commands without executing
+  them, distinguish timeout results, and write the deterministic command report
+  artifact under the run workspace.
 - Agent runner adapters invoke external AI workers and return structured raw
   outputs, streaming events, artifact paths, timestamps, exit codes, and failure
   reasons for validation. The fake agent runner is deterministic for tests. The
@@ -258,8 +263,9 @@ Testing Strategy depends on validated Architecture, Pattern Miner, and Flow
 Tracer output. Its output contract is `testing-strategy-output`, which records
 test types found, quality gates, protected behavior, unprotected behavior,
 command evidence, testing risks, recommendations, and findings. It must mark
-commands as `not-run` unless the agent has command evidence that they ran, and
-passed quality gates require matching passed command evidence.
+commands as `not-run` unless the agent has command evidence that they ran,
+passed quality gates require matching passed command evidence, and runtime
+validation compares command claims with `validation/command_report.json`.
 
 Tradeoff Analyst depends on validated Architecture, Pattern Miner, and Testing
 Strategy output. Its output contract is `tradeoff-analyst-output`, which
@@ -290,6 +296,13 @@ Initial scheduling rules:
 - Failed QA routes to a revision node before final writing.
 - Final case-study and RAG-card writers run only after required findings and QA
   results are accepted.
+
+The current user-facing runtime has not wired the scheduler into `inspector
+run`. Declarative `parallelism` may be omitted or set to `1`; values greater
+than `1` fail clearly. Declarative `agents` may be omitted or must exactly match
+the implemented Scout, Architecture, Pattern Miner, Flow Tracer, Testing
+Strategy, and Tradeoff Analyst sequence. Custom agent selection is reserved for
+the scheduler-driven runtime.
 
 ## Swarm Memory Rules
 

@@ -13,14 +13,22 @@ inspector run <repo-path> --objective <objective-file> --out <output-path> [--ve
 inspector run inspection.yaml
 ```
 
+Detected quality commands are not executed by default. Use
+`--run-quality-commands` or config `runQualityCommands: true` only for trusted
+repositories; disabled runs still write `validation/command_report.json` with a
+skipped reason. When execution is enabled, Testing Strategy command claims are
+checked against that report.
+
 Use `--verbose` to stream professional inspection progress, including indexing,
 agent lifecycle, validation, retry, QA, and final output locations. Stack traces
 are hidden by default and shown only with `--debug`.
 
 Config files support `repoPath`, `outputPath`, `objective`, `targetContext`,
-`agents`, `parallelism`, `maxRetries`, `verbose`, and `runner`. Existing CLI
-flags such as `--objective`, `--out`, and `--verbose` override config values
-where they apply.
+`agents`, `parallelism`, `maxRetries`, `runQualityCommands`, `verbose`, and
+`runner`. Existing CLI flags such as `--objective`, `--out`, and `--verbose`
+override config values where they apply. Custom `agents` selection and
+`parallelism > 1` are reserved until scheduler-driven orchestration is wired
+into the user-facing runtime.
 
 ## Goals
 

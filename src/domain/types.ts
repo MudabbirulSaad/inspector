@@ -373,6 +373,7 @@ export interface RunConfig {
   agents?: string[];
   parallelism?: number;
   maxRetries?: number;
+  runQualityCommands?: boolean;
   runner?: {
     provider: string;
     command?: string;

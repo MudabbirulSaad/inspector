@@ -38,6 +38,7 @@
     },
     "parallelism": { "type": "integer", "minimum": 1 },
     "maxRetries": { "type": "integer", "minimum": 0 },
+    "runQualityCommands": { "type": "boolean" },
     "runner": {
       "type": "object",
       "additionalProperties": false,

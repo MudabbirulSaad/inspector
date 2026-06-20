@@ -7,6 +7,7 @@ import test from "node:test";
 import { NodeValidationReportWriter } from "../../src/adapters/filesystem/index.js";
 import { getAgentContract } from "../../src/agents/index.js";
 import { validateAgentOutput } from "../../src/application/index.js";
+import type { QualityCommandReport } from "../../src/application/run-quality-commands.js";
 import type {
   RunWorkspace,
   ValidationReportWriter,
@@ -168,6 +169,143 @@ test("agent output validator rejects Testing Strategy passed gates without passe
   );
   assert.match(reports.writes[0]?.content ?? "", /npm test/);
 });
+
+test("agent output validator rejects Testing Strategy passed command claims when command report was skipped", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "passed",
+    qualityGateStatus: "passed",
+    report: skippedCommandReport(),
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /command report was skipped/,
+  );
+});
+
+test("agent output validator accepts Testing Strategy not-run command claims when command report was skipped", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "not-run",
+    qualityGateStatus: "not-run",
+    report: skippedCommandReport(),
+  });
+
+  assert.equal(result.valid, true);
+});
+
+test("agent output validator accepts Testing Strategy passed command claims matching the command report", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "passed",
+    qualityGateStatus: "passed",
+    report: commandReport("passed"),
+  });
+
+  assert.equal(result.valid, true);
+});
+
+test("agent output validator accepts Testing Strategy failed command claims matching the command report", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "failed",
+    qualityGateStatus: "failed",
+    report: commandReport("failed"),
+  });
+
+  assert.equal(result.valid, true);
+});
+
+test("agent output validator rejects Testing Strategy not-run claims that contradict an executed command report entry", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "not-run",
+    qualityGateStatus: "not-run",
+    report: commandReport("passed"),
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /contradicts executed command report entry/,
+  );
+});
+
+test("agent output validator rejects Testing Strategy passed command claims missing from the command report", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "passed",
+    qualityGateStatus: "passed",
+    report: { commands: [] },
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /no matching quality command report entry/,
+  );
+});
+
+async function validateTestingStrategyWithCommandReport(input: {
+  commandEvidenceStatus: "passed" | "failed" | "not-run";
+  qualityGateStatus: "passed" | "failed" | "not-run";
+  report: QualityCommandReport;
+}): ReturnType<typeof validateAgentOutput> {
+  const reports = new InMemoryValidationReports();
+  const output = await readExampleObject("testing-strategy-output");
+  output.qualityGates = [
+    {
+      command: "npm test",
+      status: input.qualityGateStatus,
+      summary: "Quality command claim under test.",
+      evidence: [{ file: "package.json", lineStart: 1, lineEnd: 12 }],
+    },
+  ];
+  output.commandEvidence = [
+    {
+      command: "npm test",
+      status: input.commandEvidenceStatus,
+      ...(input.commandEvidenceStatus === "not-run"
+        ? {}
+        : {
+            exitCode: input.commandEvidenceStatus === "passed" ? 0 : 1,
+            ranAt: "2026-06-20T01:02:03.004Z",
+          }),
+      evidence: [{ file: "package.json", lineStart: 1, lineEnd: 12 }],
+    },
+  ];
+
+  return validateAgentOutput({
+    workspace,
+    agent: getAgentContract("testing_strategy"),
+    attempt: 1,
+    rawOutput: JSON.stringify(output),
+    validators: await createSchemaContractValidators(),
+    reports,
+    qualityCommandReport: input.report,
+  });
+}
+
+function skippedCommandReport(): QualityCommandReport {
+  return {
+    skipped: true,
+    reason:
+      "Quality command execution is disabled by default. Use --run-quality-commands or runQualityCommands: true only for trusted repositories.",
+    commands: [],
+  };
+}
+
+function commandReport(status: "passed" | "failed"): QualityCommandReport {
+  return {
+    commands: [
+      {
+        command: "npm",
+        args: ["test"],
+        exitCode: status === "passed" ? 0 : 1,
+        stdout: "",
+        stderr: "",
+        durationMs: 10,
+        status,
+      },
+    ],
+  };
+}
 
 test("agent output validator rejects Tradeoff Analyst outputs with unsupported tradeoffs", async () => {
   const reports = new InMemoryValidationReports();

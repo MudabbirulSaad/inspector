@@ -45,6 +45,7 @@ test("runs safe quality commands and reports successful results", async () => {
     cwd: "/repo",
     runner,
     timeoutMs: 1000,
+    enabled: true,
   });
 
   assert.deepEqual(
@@ -88,6 +89,54 @@ test("runs safe quality commands and reports successful results", async () => {
   });
 });
 
+test("skips quality commands by default without invoking the process runner", async () => {
+  const runner = new QueuedProcessRunner([]);
+
+  const report = await runQualityCommands({
+    detectedCommands: detected("test", "npm test"),
+    cwd: "/repo",
+    runner,
+  });
+
+  assert.deepEqual(runner.requests, []);
+  assert.deepEqual(report, {
+    skipped: true,
+    reason:
+      "Quality command execution is disabled by default. Use --run-quality-commands or runQualityCommands: true only for trusted repositories.",
+    commands: [],
+  });
+});
+
+test("executes safe quality commands when explicitly enabled", async () => {
+  const runner = new QueuedProcessRunner([
+    processResult({
+      stdout: "tests passed\n",
+      startedAt: "2026-06-20T00:00:00.000Z",
+      completedAt: "2026-06-20T00:00:00.250Z",
+    }),
+  ]);
+
+  const report = await runQualityCommands({
+    detectedCommands: detected("test", "npm test"),
+    cwd: "/repo",
+    runner,
+    enabled: true,
+  });
+
+  assert.deepEqual(runner.requests.map((request) => request.command), ["npm"]);
+  assert.deepEqual(report.commands, [
+    {
+      command: "npm",
+      args: ["test"],
+      exitCode: 0,
+      stdout: "tests passed\n",
+      stderr: "",
+      durationMs: 250,
+      status: "passed",
+    },
+  ]);
+});
+
 test("reports failed quality commands with captured output", async () => {
   const runner = new QueuedProcessRunner([
     processResult({
@@ -103,6 +152,7 @@ test("reports failed quality commands with captured output", async () => {
     detectedCommands: detected("test", "npm test"),
     cwd: "/repo",
     runner,
+    enabled: true,
   });
 
   assert.deepEqual(report.commands, [
@@ -125,6 +175,7 @@ test("blocks unsafe or unapproved detected commands without executing them", asy
     detectedCommands: detected("test", "npm test && rm -rf dist"),
     cwd: "/repo",
     runner,
+    enabled: true,
   });
 
   assert.deepEqual(runner.requests, []);
@@ -157,6 +208,7 @@ test("reports timed out quality commands distinctly", async () => {
     cwd: "/repo",
     runner,
     timeoutMs: 50,
+    enabled: true,
   });
 
   assert.deepEqual(report.commands, [

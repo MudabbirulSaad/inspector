@@ -22,6 +22,8 @@ export interface QualityCommandResult {
 }
 
 export interface QualityCommandReport {
+  skipped?: boolean;
+  reason?: string;
   commands: QualityCommandResult[];
 }
 
@@ -30,6 +32,7 @@ export interface RunQualityCommandsRequest {
   cwd: string;
   runner: ProcessRunner;
   timeoutMs?: number;
+  enabled?: boolean;
 }
 
 export interface WriteQualityCommandReportRequest {
@@ -43,6 +46,15 @@ const runnableCategories = new Set(["test", "typecheck", "lint", "build"]);
 export async function runQualityCommands(
   request: RunQualityCommandsRequest,
 ): Promise<QualityCommandReport> {
+  if (request.enabled !== true) {
+    return {
+      skipped: true,
+      reason:
+        "Quality command execution is disabled by default. Use --run-quality-commands or runQualityCommands: true only for trusted repositories.",
+      commands: [],
+    };
+  }
+
   const results: QualityCommandResult[] = [];
 
   for (const detected of request.detectedCommands.commands) {

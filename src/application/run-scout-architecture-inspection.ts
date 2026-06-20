@@ -1,11 +1,9 @@
-import { getAgentContract, type AgentContractId } from "../agents/index.js";
+import type { AgentContractId } from "../agents/index.js";
 import type {
   ArchitectureOutput,
-  Evidence,
   Finding,
   FlowTracerOutput,
   PatternMinerOutput,
-  RevisionRequest,
   RunConfig,
   ScoutOutput,
   TestingStrategyOutput,
@@ -15,6 +13,7 @@ import type {
   AgentOutputArtifactWriter,
   AgentOutputSchemaReader,
   AgentRunner,
+  AgentStatusArtifactWriter,
   CaseStudyDocumentWriter,
   Clock,
   EvidenceValidationReportWriter,
@@ -41,9 +40,7 @@ import {
   appendSwarmQaIssue,
   appendVerifiedSwarmFinding,
 } from "./append-swarm-memory.js";
-import { buildAgentPrompt } from "./build-agent-prompt.js";
 import { createInspectionRunWorkspace } from "./create-inspection-run-workspace.js";
-import { executeAgentRun } from "./execute-agent-run.js";
 import { generateCaseStudyDocumentation } from "./generate-case-study-documentation.js";
 import { generateRagKnowledgeCards } from "./generate-rag-knowledge-cards.js";
 import { indexTargetRepository } from "./index-target-repository.js";
@@ -52,7 +49,20 @@ import {
   runQualityCommands,
   writeQualityCommandReport,
 } from "./run-quality-commands.js";
-import { validateAgentOutput } from "./validate-agent-output.js";
+import {
+  architectureEvidenceFindings,
+  flowTracerEvidenceFindings,
+  patternMinerEvidenceFindings,
+  renderInitialMemorySnapshot,
+  scoutEvidenceFindings,
+  testingStrategyEvidenceFindings,
+  tradeoffAnalystEvidenceFindings,
+} from "./specialist-output-mappers.js";
+import {
+  runAgentWorkflowStep,
+  writeEvidenceLifecycleStatus,
+} from "./run-agent-workflow-step.js";
+import { routeQaRevisionRequests } from "./qa-revision-routing.js";
 import {
   type EvidenceValidationResult,
   repositoryFilesForEvidence,
@@ -76,6 +86,7 @@ export interface RunScoutArchitectureInspectionInput {
   memory: (workspace: RunWorkspace) => SwarmMemoryStore;
   promptTemplates: PromptTemplateReader;
   promptArtifacts: PromptArtifactWriter;
+  statusArtifacts: AgentStatusArtifactWriter;
   outputArtifacts: AgentOutputArtifactWriter;
   validationReports: ValidationReportWriter;
   evidenceReports: EvidenceValidationReportWriter;
@@ -106,6 +117,8 @@ export class InspectionRunFailedError extends Error {
 export async function runScoutArchitectureInspection(
   input: RunScoutArchitectureInspectionInput,
 ): Promise<RunScoutArchitectureInspectionResult> {
+  validateRuntimeConfig(input.config);
+
   input.progress?.("Run workspace creation started");
   const workspace = await createInspectionRunWorkspace({
     config: input.config,
@@ -134,6 +147,7 @@ export async function runScoutArchitectureInspection(
     detectedCommands,
     cwd: input.config.target.root,
     runner: input.processRunner,
+    enabled: input.config.runQualityCommands === true,
     ...(input.config.runner?.timeoutMs === undefined
       ? {}
       : { timeoutMs: input.config.runner.timeoutMs }),
@@ -193,6 +207,13 @@ export async function runScoutArchitectureInspection(
     findings: scoutEvidence,
     evidenceReports: input.evidenceReports,
   });
+  await writeEvidenceLifecycleStatus({
+    input,
+    workspace,
+    lifecycle: scoutSchemaResult.lifecycle,
+    valid: scoutEvidenceResult.valid,
+    reason: scoutEvidenceResult.errors[0]?.message,
+  });
 
   if (!scoutEvidenceResult.valid) {
     throw new InspectionRunFailedError(
@@ -244,6 +265,13 @@ export async function runScoutArchitectureInspection(
     findings: architectureEvidenceFindings(architectureOutput),
     evidenceReports: input.evidenceReports,
   });
+  await writeEvidenceLifecycleStatus({
+    input,
+    workspace,
+    lifecycle: architectureSchemaResult.lifecycle,
+    valid: architectureEvidenceResult.valid,
+    reason: architectureEvidenceResult.errors[0]?.message,
+  });
 
   if (!architectureEvidenceResult.valid) {
     throw new InspectionRunFailedError(
@@ -294,6 +322,13 @@ export async function runScoutArchitectureInspection(
     entries,
     findings: patternMinerEvidenceFindings(patternMinerOutput),
     evidenceReports: input.evidenceReports,
+  });
+  await writeEvidenceLifecycleStatus({
+    input,
+    workspace,
+    lifecycle: patternMinerSchemaResult.lifecycle,
+    valid: patternMinerEvidenceResult.valid,
+    reason: patternMinerEvidenceResult.errors[0]?.message,
   });
 
   if (!patternMinerEvidenceResult.valid) {
@@ -349,6 +384,13 @@ export async function runScoutArchitectureInspection(
     findings: flowTracerEvidenceFindings(flowTracerOutput),
     evidenceReports: input.evidenceReports,
   });
+  await writeEvidenceLifecycleStatus({
+    input,
+    workspace,
+    lifecycle: flowTracerSchemaResult.lifecycle,
+    valid: flowTracerEvidenceResult.valid,
+    reason: flowTracerEvidenceResult.errors[0]?.message,
+  });
 
   if (!flowTracerEvidenceResult.valid) {
     throw new InspectionRunFailedError(
@@ -380,7 +422,9 @@ export async function runScoutArchitectureInspection(
       architecture: architectureOutput,
       pattern_miner: patternMinerOutput,
       flow_tracer: flowTracerOutput,
+      qualityCommandReport: commandReport,
     },
+    qualityCommandReport: commandReport,
   });
 
   if (!testingStrategySchemaResult.valid) {
@@ -404,6 +448,13 @@ export async function runScoutArchitectureInspection(
     entries,
     findings: testingStrategyEvidenceFindings(testingStrategyOutput),
     evidenceReports: input.evidenceReports,
+  });
+  await writeEvidenceLifecycleStatus({
+    input,
+    workspace,
+    lifecycle: testingStrategySchemaResult.lifecycle,
+    valid: testingStrategyEvidenceResult.valid,
+    reason: testingStrategyEvidenceResult.errors[0]?.message,
   });
 
   if (!testingStrategyEvidenceResult.valid) {
@@ -461,6 +512,13 @@ export async function runScoutArchitectureInspection(
     entries,
     findings: tradeoffAnalystEvidenceFindings(tradeoffAnalystOutput),
     evidenceReports: input.evidenceReports,
+  });
+  await writeEvidenceLifecycleStatus({
+    input,
+    workspace,
+    lifecycle: tradeoffAnalystSchemaResult.lifecycle,
+    valid: tradeoffAnalystEvidenceResult.valid,
+    reason: tradeoffAnalystEvidenceResult.errors[0]?.message,
   });
 
   if (!tradeoffAnalystEvidenceResult.valid) {
@@ -585,70 +643,36 @@ export async function runScoutArchitectureInspection(
   return { workspace };
 }
 
-async function runAgentWorkflowStep(input: {
-  input: RunScoutArchitectureInspectionInput;
-  workspace: RunWorkspace;
-  agentId:
-    | "scout"
-    | "architecture"
-    | "pattern_miner"
-    | "flow_tracer"
-    | "testing_strategy"
-    | "tradeoff_analyst";
-  progressName: string;
-  repoIndexSummary: unknown;
-  memorySnapshot: string;
-  previousOutputs: unknown;
-  attempt?: number;
-  revisionRequest?: unknown;
-}): ReturnType<typeof validateAgentOutput> {
-  const agent = getAgentContract(input.agentId);
-  const attempt = input.attempt ?? 1;
-  const prompt = await buildAgentPrompt({
-    agentId: input.agentId,
-    attempt,
-    workspace: input.workspace,
-    templates: input.input.promptTemplates,
-    artifacts: input.input.promptArtifacts,
-    objective: input.input.objective,
-    targetRepoContext: input.input.config.target,
-    repoIndexSummary: input.repoIndexSummary,
-    previousOutputs: input.previousOutputs,
-    memorySnapshot: input.memorySnapshot,
-    revisionRequest: input.revisionRequest,
-    outputSchema: await input.input.schemaReader.readAgentOutputSchema(
-      agent.outputSchema,
-    ),
-  });
+const implementedSpecialistSequence = [
+  "scout",
+  "architecture",
+  "pattern_miner",
+  "flow_tracer",
+  "testing_strategy",
+  "tradeoff_analyst",
+] as const;
 
-  input.input.progress?.(`Agent started: ${input.progressName} (attempt ${attempt})`);
-  const run = await executeAgentRun({
-    runner: input.input.runner,
-    agentId: input.agentId,
-    attempt,
-    prompt: prompt.prompt,
-    workspaceRoot: input.workspace.root,
-    onStreamingEvent: (event) => {
-      input.input.stream?.(input.agentId, event.kind, event.message);
-    },
-  });
-  await input.input.outputArtifacts.writeAgentOutput({
-    workspace: input.workspace,
-    agentId: input.agentId,
-    attempt,
-    content: run.stdout,
-  });
-  input.input.progress?.(`Agent finished: ${input.progressName} (attempt ${attempt})`);
+function validateRuntimeConfig(config: RunConfig): void {
+  if (config.parallelism !== undefined && config.parallelism > 1) {
+    throw new Error(
+      "parallelism > 1 is reserved for scheduler-driven orchestration and is not active before Milestone 34+",
+    );
+  }
 
-  input.input.progress?.(`Validating ${input.progressName} schema`);
-  return validateAgentOutput({
-    workspace: input.workspace,
-    agent,
-    attempt,
-    rawOutput: run.stdout,
-    validators: input.input.validators,
-    reports: input.input.validationReports,
-  });
+  if (config.agents === undefined) {
+    return;
+  }
+
+  if (
+    config.agents.length !== implementedSpecialistSequence.length ||
+    config.agents.some(
+      (agentId, index) => agentId !== implementedSpecialistSequence[index],
+    )
+  ) {
+    throw new Error(
+      "custom agent selection is reserved for scheduler-driven orchestration and is not active in the current runtime slice",
+    );
+  }
 }
 
 async function validateEvidenceForAgent(input: {
@@ -678,600 +702,4 @@ async function validateEvidenceForAgent(input: {
   });
 
   return result;
-}
-
-async function routeQaRevisionRequests(input: {
-  input: RunScoutArchitectureInspectionInput;
-  workspace: RunWorkspace;
-  runMemory: SwarmMemoryStore;
-  repoIndexSummary: unknown;
-  memorySnapshot: string;
-  entries: RepositoryEntry[];
-  candidateFindings: Finding[];
-  schemaReports: QaSchemaReport[];
-  evidenceReports: QaEvidenceReport[];
-  agentOutputs: Partial<Record<AgentContractId, unknown>>;
-  revisionRequests: RevisionRequest[];
-}): Promise<void> {
-  const requestsByOwner = new Map<
-    | "scout"
-    | "architecture"
-    | "pattern_miner"
-    | "flow_tracer"
-    | "testing_strategy"
-    | "tradeoff_analyst",
-    RevisionRequest[]
-  >();
-
-  for (const request of input.revisionRequests) {
-    if (
-      request.targetAgent === "scout" ||
-      request.targetAgent === "architecture" ||
-      request.targetAgent === "pattern_miner" ||
-      request.targetAgent === "flow_tracer" ||
-      request.targetAgent === "testing_strategy" ||
-      request.targetAgent === "tradeoff_analyst"
-    ) {
-      requestsByOwner.set(request.targetAgent, [
-        ...(requestsByOwner.get(request.targetAgent) ?? []),
-        request,
-      ]);
-    }
-  }
-
-  for (const [agentId, revisionRequests] of requestsByOwner) {
-    const agent = getAgentContract(agentId);
-    const nextAttempt = 2;
-    const retryNumber = nextAttempt - 1;
-
-    if (
-      input.input.config.maxRetries === undefined
-        ? nextAttempt > agent.retryPolicy.maxAttempts
-        : retryNumber > input.input.config.maxRetries
-    ) {
-      continue;
-    }
-
-    input.input.progress?.(
-      `Retrying ${displayNameForAgent(agentId)} after QA feedback (attempt ${nextAttempt})`,
-    );
-    const schemaResult = await runAgentWorkflowStep({
-      input: input.input,
-      workspace: input.workspace,
-      agentId,
-      progressName: displayNameForAgent(agentId),
-      repoIndexSummary: input.repoIndexSummary,
-      memorySnapshot: input.memorySnapshot,
-      previousOutputs: {
-        previousOwnerOutput: input.agentOutputs[agentId],
-        allPreviousOutputs: input.agentOutputs,
-      },
-      attempt: nextAttempt,
-      revisionRequest: revisionRequests,
-    });
-
-    replaceSchemaReport(input.schemaReports, {
-      agentId,
-      valid: schemaResult.valid,
-      errors: schemaResult.errors.map((error) => ({
-        message: error.message,
-        path: error.path,
-        keyword: error.keyword,
-      })),
-    });
-
-    if (!schemaResult.valid) {
-      continue;
-    }
-
-    const output = schemaResult.value;
-    const findings = findingsForAgentOutput(agentId, output);
-    input.agentOutputs[agentId] = output;
-    replaceCandidateFindingsForAgent(input.candidateFindings, agentId, findings);
-
-    const evidenceResult = await validateEvidenceForAgent({
-      agentId,
-      workspace: input.workspace,
-      repositoryReader: input.input.repositoryReader,
-      entries: input.entries,
-      findings: evidenceFindingsForAgentOutput(agentId, output),
-      evidenceReports: input.input.evidenceReports,
-      attempt: nextAttempt,
-    });
-
-    replaceEvidenceReport(input.evidenceReports, {
-      agentId,
-      valid: evidenceResult.valid,
-      errors: evidenceResult.errors,
-    });
-
-    if (!evidenceResult.valid) {
-      continue;
-    }
-
-    for (const finding of findings) {
-      await appendSwarmFinding({
-        finding,
-        memory: input.runMemory,
-        validator: input.input.validators.finding,
-      });
-    }
-  }
-}
-
-function displayNameForAgent(
-  agentId:
-    | "scout"
-    | "architecture"
-    | "pattern_miner"
-    | "flow_tracer"
-    | "testing_strategy"
-    | "tradeoff_analyst",
-): string {
-  if (agentId === "pattern_miner") {
-    return "Pattern Miner";
-  }
-  if (agentId === "flow_tracer") {
-    return "Flow Tracer";
-  }
-  if (agentId === "testing_strategy") {
-    return "Testing Strategy";
-  }
-  if (agentId === "tradeoff_analyst") {
-    return "Tradeoff Analyst";
-  }
-  return agentId[0]?.toUpperCase() + agentId.slice(1);
-}
-
-function replaceSchemaReport(
-  reports: QaSchemaReport[],
-  next: QaSchemaReport,
-): void {
-  const index = reports.findIndex((report) => report.agentId === next.agentId);
-  if (index === -1) {
-    reports.push(next);
-    return;
-  }
-  reports[index] = next;
-}
-
-function replaceEvidenceReport(
-  reports: QaEvidenceReport[],
-  next: QaEvidenceReport,
-): void {
-  const index = reports.findIndex((report) => report.agentId === next.agentId);
-  if (index === -1) {
-    reports.push(next);
-    return;
-  }
-  reports[index] = next;
-}
-
-function replaceCandidateFindingsForAgent(
-  findings: Finding[],
-  agentId: string,
-  replacements: Finding[],
-): void {
-  const retained = findings.filter((finding) => finding.agent !== agentId);
-  findings.splice(0, findings.length, ...retained, ...replacements);
-}
-
-function findingsForAgentOutput(
-  agentId:
-    | "scout"
-    | "architecture"
-    | "pattern_miner"
-    | "flow_tracer"
-    | "testing_strategy"
-    | "tradeoff_analyst",
-  output: unknown,
-): Finding[] {
-  if (agentId === "scout") {
-    return (output as ScoutOutput).findings;
-  }
-  if (agentId === "architecture") {
-    return (output as ArchitectureOutput).findings;
-  }
-  if (agentId === "pattern_miner") {
-    return (output as PatternMinerOutput).findings;
-  }
-  if (agentId === "flow_tracer") {
-    return (output as FlowTracerOutput).findings;
-  }
-  if (agentId === "testing_strategy") {
-    return (output as TestingStrategyOutput).findings;
-  }
-  return (output as TradeoffAnalystOutput).findings;
-}
-
-function evidenceFindingsForAgentOutput(
-  agentId:
-    | "scout"
-    | "architecture"
-    | "pattern_miner"
-    | "flow_tracer"
-    | "testing_strategy"
-    | "tradeoff_analyst",
-  output: unknown,
-): Finding[] {
-  if (agentId === "scout") {
-    return scoutEvidenceFindings(output as ScoutOutput);
-  }
-  if (agentId === "architecture") {
-    return architectureEvidenceFindings(output as ArchitectureOutput);
-  }
-  if (agentId === "pattern_miner") {
-    return patternMinerEvidenceFindings(output as PatternMinerOutput);
-  }
-  if (agentId === "flow_tracer") {
-    return flowTracerEvidenceFindings(output as FlowTracerOutput);
-  }
-  if (agentId === "testing_strategy") {
-    return testingStrategyEvidenceFindings(output as TestingStrategyOutput);
-  }
-  return tradeoffAnalystEvidenceFindings(output as TradeoffAnalystOutput);
-}
-
-function renderInitialMemorySnapshot(objective: string): string {
-  return [`## Run initialized`, "", `Objective: ${objective.trim()}`, "", ""].join(
-    "\n",
-  );
-}
-
-function scoutEvidenceFindings(output: ScoutOutput): Finding[] {
-  return [
-    evidenceFinding(
-      "finding-scout-project-type",
-      `Scout identified project type: ${output.projectType.value}`,
-      output.projectType.evidence,
-    ),
-    ...output.detectedStack.map((signal, index) =>
-      evidenceFinding(
-        `finding-scout-stack-${index + 1}`,
-        `Scout detected stack signal: ${signal.name}`,
-        signal.evidence,
-      ),
-    ),
-    ...output.importantFiles.map((file, index) =>
-      evidenceFinding(
-        `finding-scout-important-file-${index + 1}`,
-        `Scout marked ${file.path} as important: ${file.reason}`,
-        file.evidence,
-      ),
-    ),
-    ...output.entryPoints.map((entryPoint, index) =>
-      evidenceFinding(
-        `finding-scout-entrypoint-${index + 1}`,
-        `Scout marked ${entryPoint.path} as an entry point: ${entryPoint.kind}`,
-        entryPoint.evidence,
-      ),
-    ),
-    evidenceFinding(
-      "finding-scout-architecture-impression",
-      output.architectureImpression.summary,
-      output.architectureImpression.evidence,
-    ),
-    ...output.findings,
-  ];
-}
-
-function evidenceFinding(id: string, claim: string, evidence: Evidence[]): Finding {
-  return {
-    id,
-    agent: "scout",
-    severity: "info",
-    claim,
-    evidence,
-    recommendation: "Use this Scout observation only as initial inspection context.",
-    confidence: 0.5,
-  };
-}
-
-function architectureEvidenceFindings(output: ArchitectureOutput): Finding[] {
-  return [
-    ...output.layerMap.map((item, index) =>
-      architectureObservationFinding("layer-map", index, item),
-    ),
-    ...output.dependencyDirection.map((item, index) =>
-      architectureObservationFinding(
-        "dependency-direction",
-        index,
-        item,
-        `${item.source} -> ${item.target}: ${item.direction}`,
-      ),
-    ),
-    ...output.moduleBoundaries.map((item, index) =>
-      architectureObservationFinding("module-boundary", index, item),
-    ),
-    ...output.businessLogicLocations.map((item, index) =>
-      architectureObservationFinding("business-logic", index, item),
-    ),
-    ...output.frameworkGlueLocations.map((item, index) =>
-      architectureObservationFinding("framework-glue", index, item),
-    ),
-    ...output.architectureRisks.map((item, index) =>
-      architectureObservationFinding("risk", index, item),
-    ),
-    ...output.findings,
-  ];
-}
-
-function patternMinerEvidenceFindings(output: PatternMinerOutput): Finding[] {
-  return [
-    ...output.patterns.map((pattern, index) => ({
-      id: `finding-pattern-miner-pattern-${index + 1}`,
-      agent: "pattern_miner",
-      severity: "info" as const,
-      claim: `${pattern.name}: ${pattern.problemSolved}`,
-      evidence: pattern.evidence,
-      recommendation: pattern.adaptationValue,
-      confidence: pattern.confidence,
-    })),
-    ...output.findings,
-  ];
-}
-
-function flowTracerEvidenceFindings(output: FlowTracerOutput): Finding[] {
-  return [
-    ...output.flows.flatMap((flow, index) => [
-      {
-        id: `finding-flow-tracer-flow-${index + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: `${flow.name}: ${flow.action}`,
-        evidence: flow.evidence,
-        recommendation:
-          "Use this flow trace only where each step remains backed by cited repository evidence.",
-        confidence: 0.6,
-      },
-      {
-        id: `finding-flow-tracer-entry-${index + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: `Flow entry point: ${flow.entryPoint.path}`,
-        evidence: flow.entryPoint.evidence,
-        recommendation: "Keep entry point claims tied to the cited file range.",
-        confidence: 0.5,
-      },
-      ...flow.mainFiles.map((file, fileIndex) => ({
-        id: `finding-flow-tracer-main-file-${index + 1}-${fileIndex + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: `${file.path}: ${file.role}`,
-        evidence: file.evidence,
-        recommendation: "Treat this file role as part of the traced flow.",
-        confidence: 0.5,
-      })),
-      ...flow.dataPath.map((step, stepIndex) => ({
-        id: `finding-flow-tracer-data-path-${index + 1}-${stepIndex + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: step.step,
-        evidence: step.evidence,
-        recommendation: "Preserve this data path step only with its cited evidence.",
-        confidence: 0.5,
-      })),
-      ...flow.sideEffects.map((sideEffect, sideEffectIndex) => ({
-        id: `finding-flow-tracer-side-effect-${index + 1}-${sideEffectIndex + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: sideEffect.description,
-        evidence: sideEffect.evidence,
-        recommendation: "Keep side-effect claims bounded by visible evidence.",
-        confidence: 0.5,
-      })),
-      ...flow.persistencePath.map((persistence, persistenceIndex) => ({
-        id: `finding-flow-tracer-persistence-${index + 1}-${persistenceIndex + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: persistence.description,
-        evidence: persistence.evidence,
-        recommendation: "Use this persistence observation only as far as evidence supports it.",
-        confidence: 0.5,
-      })),
-      ...flow.errorPaths.map((errorPath, errorIndex) => ({
-        id: `finding-flow-tracer-error-${index + 1}-${errorIndex + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: errorPath.description,
-        evidence: errorPath.evidence,
-        recommendation: "Do not infer additional error paths beyond this evidence.",
-        confidence: 0.5,
-      })),
-      ...flow.tests.map((visibleTest, testIndex) => ({
-        id: `finding-flow-tracer-test-${index + 1}-${testIndex + 1}`,
-        agent: "flow_tracer",
-        severity: "info" as const,
-        claim: visibleTest.description,
-        evidence: visibleTest.evidence,
-        recommendation: "Keep test coverage claims tied to visible test evidence.",
-        confidence: 0.5,
-      })),
-    ]),
-    ...output.insufficientEvidence.map((gap, index) => ({
-      id: `finding-flow-tracer-insufficient-evidence-${index + 1}`,
-      agent: "flow_tracer",
-      severity: "info" as const,
-      claim: `${gap.topic}: ${gap.reason}`,
-      evidence: gap.evidence,
-      recommendation: "Report this as insufficient evidence rather than inventing a flow.",
-      confidence: 0.4,
-    })),
-    ...output.findings,
-  ];
-}
-
-function testingStrategyEvidenceFindings(
-  output: TestingStrategyOutput,
-): Finding[] {
-  return [
-    ...output.testTypesFound.map((item, index) =>
-      testingStrategyNoteFinding("test-type", index, item),
-    ),
-    ...output.qualityGates.map((gate, index) => ({
-      id: `finding-testing-strategy-quality-gate-${index + 1}`,
-      agent: "testing_strategy",
-      severity: "info" as const,
-      claim: `${gate.command}: ${gate.status}. ${gate.summary}`,
-      evidence: gate.evidence,
-      recommendation:
-        gate.status === "not-run"
-          ? "Do not claim this gate passed until the command is run."
-          : "Preserve this quality gate with explicit command evidence.",
-      confidence: gate.status === "passed" ? 0.7 : 0.5,
-    })),
-    ...output.behaviorProtected.map((item, index) =>
-      testingStrategyNoteFinding("behavior-protected", index, item),
-    ),
-    ...output.behaviorNotProtected.map((item, index) =>
-      testingStrategyNoteFinding("behavior-not-protected", index, item),
-    ),
-    ...output.commandEvidence.map((command, index) => ({
-      id: `finding-testing-strategy-command-${index + 1}`,
-      agent: "testing_strategy",
-      severity: "info" as const,
-      claim: `${command.command}: ${command.status}`,
-      evidence: command.evidence,
-      recommendation:
-        command.status === "not-run"
-          ? "Treat this command as available but unexecuted."
-          : "Keep command result claims tied to this recorded evidence.",
-      confidence: command.status === "passed" ? 0.7 : 0.5,
-    })),
-    ...output.testingRisks.map((item, index) =>
-      testingStrategyNoteFinding("risk", index, item, "medium"),
-    ),
-    ...output.recommendations.map((recommendation, index) => ({
-      id: `finding-testing-strategy-recommendation-${index + 1}`,
-      agent: "testing_strategy",
-      severity: recommendation.priority,
-      claim: recommendation.summary,
-      evidence: recommendation.evidence,
-      recommendation: recommendation.summary,
-      confidence: 0.6,
-    })),
-    ...output.findings,
-  ];
-}
-
-function testingStrategyNoteFinding(
-  kind: string,
-  index: number,
-  item: {
-    name: string;
-    summary: string;
-    evidence: Evidence[];
-  },
-  severity: Finding["severity"] = "info",
-): Finding {
-  return {
-    id: `finding-testing-strategy-${kind}-${index + 1}`,
-    agent: "testing_strategy",
-    severity,
-    claim: `${item.name}: ${item.summary}`,
-    evidence: item.evidence,
-    recommendation:
-      "Use this testing-strategy observation only with its cited evidence.",
-    confidence: 0.5,
-  };
-}
-
-function tradeoffAnalystEvidenceFindings(
-  output: TradeoffAnalystOutput,
-): Finding[] {
-  return [
-    ...output.strongDecisions.map((item, index) => ({
-      id: `finding-tradeoff-analyst-strong-decision-${index + 1}`,
-      agent: "tradeoff_analyst",
-      severity: "info" as const,
-      claim: `${item.decision}: ${item.tradeoff}`,
-      evidence: item.evidence,
-      recommendation: item.consequence,
-      confidence: item.confidence,
-    })),
-    ...output.weakDecisions.map((item, index) => ({
-      id: `finding-tradeoff-analyst-weak-decision-${index + 1}`,
-      agent: "tradeoff_analyst",
-      severity: "medium" as const,
-      claim: `${item.decision}: ${item.tradeoff}`,
-      evidence: item.evidence,
-      recommendation: item.risk,
-      confidence: item.confidence,
-    })),
-    ...output.overengineeringRisks.map((item, index) =>
-      tradeoffRiskFinding("overengineering", index, item),
-    ),
-    ...output.underengineeringRisks.map((item, index) =>
-      tradeoffRiskFinding("underengineering", index, item),
-    ),
-    ...output.hiddenAssumptions.map((item, index) => ({
-      id: `finding-tradeoff-analyst-hidden-assumption-${index + 1}`,
-      agent: "tradeoff_analyst",
-      severity: "medium" as const,
-      claim: item.assumption,
-      evidence: item.evidence,
-      recommendation: item.whyItMatters,
-      confidence: item.confidence,
-    })),
-    ...output.agentSafetyRisks.map((item, index) =>
-      tradeoffRiskFinding("agent-safety", index, item, "high"),
-    ),
-    ...output.adaptationWarnings.map((item, index) => ({
-      id: `finding-tradeoff-analyst-adaptation-warning-${index + 1}`,
-      agent: "tradeoff_analyst",
-      severity: "medium" as const,
-      claim: `${item.warning}: ${item.repoSpecificContext}`,
-      evidence: item.evidence,
-      recommendation: item.adaptationAdvice,
-      confidence: item.confidence,
-    })),
-    ...output.findings,
-  ];
-}
-
-function tradeoffRiskFinding(
-  kind: string,
-  index: number,
-  item: {
-    risk: string;
-    tradeoff: string;
-    consequence: string;
-    evidence: Evidence[];
-    confidence: number;
-  },
-  severity: Finding["severity"] = "medium",
-): Finding {
-  return {
-    id: `finding-tradeoff-analyst-${kind}-risk-${index + 1}`,
-    agent: "tradeoff_analyst",
-    severity,
-    claim: `${item.risk}: ${item.tradeoff}`,
-    evidence: item.evidence,
-    recommendation: item.consequence,
-    confidence: item.confidence,
-  };
-}
-
-function architectureObservationFinding(
-  kind: string,
-  index: number,
-  observation: {
-    name: string;
-    observedFacts: string[];
-    interpretation?: string;
-    evidence: Evidence[];
-  },
-  detail = observation.name,
-): Finding {
-  return {
-    id: `finding-architecture-${kind}-${index + 1}`,
-    agent: "architecture",
-    severity: "info",
-    claim: `${detail}: ${observation.observedFacts.join(" ")}`,
-    evidence: observation.evidence,
-    recommendation:
-      observation.interpretation ??
-      "Treat this architecture observation as evidence-backed context.",
-    confidence: 0.5,
-  };
 }
