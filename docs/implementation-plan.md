@@ -101,3 +101,40 @@ git status
 ```bash
 docs(architecture): reconcile blueprint for fixed implementation plan
 ```
+
+### Milestone 02: TypeScript Tooling Upgrade
+
+#### Goal
+
+Add TypeScript tooling while preserving existing schema/example validation.
+
+#### Tasks
+
+- Inspect existing `package.json`, `package-lock.json`, and tests.
+- Add TypeScript strict mode.
+- Add source and test structure for TypeScript.
+- Use Node's built-in `node:test` runner with `tsx` for TypeScript tests.
+- Justify the test strategy in docs.
+- Add working `typecheck`, `lint`, `build`, and optional `dev` scripts.
+- Preserve existing schema validation tests.
+
+#### TDD
+
+Added a minimal TypeScript smoke test for exported agent output contract names
+before implementing the source module and TypeScript test runner wiring.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+chore(tooling): add TypeScript CLI toolchain
+```

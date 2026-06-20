@@ -4,6 +4,12 @@
 
 Use TDD for implementation and validation behavior. Work in vertical slices: write one behavior test, make it pass with the smallest production-quality change, then refactor while tests remain green.
 
+## Test Runner
+
+Use Node's built-in `node:test` runner for both JavaScript and TypeScript tests.
+TypeScript tests run through `tsx` via `node --import tsx`, preserving the
+existing schema/example validation test while avoiding a second test framework.
+
 ## Domain and Application Tests
 
 Domain and application tests should verify behavior through public interfaces. They should cover agent planning, dependency-aware execution rules, evidence validation, QA rerouting decisions, and report assembly.
@@ -19,6 +25,9 @@ JSON Schema tests validate that example outputs match the published contracts, i
 ## Type Checking
 
 Domain contract interfaces in `src/domain/types.ts` should mirror the JSON Schema contracts. Run `npm run typecheck` after changing schemas or domain types.
+
+`typecheck` validates both production TypeScript and TypeScript tests. `build`
+emits only production source from `src/` to `dist/`.
 
 ## CLI Behavior Tests
 

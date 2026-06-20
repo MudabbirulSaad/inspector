@@ -5,20 +5,26 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "test:watch": "node --test --watch tests/*.test.mjs",
-    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/index.ts",
+    "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts",
+    "test:watch": "node --import tsx --test --watch tests/*.test.mjs tests/*.test.ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "lint": "eslint .",
     "build": "tsc",
-    "validate": "npm test && npm run typecheck && npm run build"
+    "validate": "npm test && npm run typecheck && npm run lint && npm run build"
   },
   "engines": {
     "node": ">=22.18.0"
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "typescript": "^6.0.3"
+    "eslint": "^10.5.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
   }
 }
