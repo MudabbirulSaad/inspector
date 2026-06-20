@@ -17,6 +17,7 @@ import { runInspectorCli } from "../../src/adapters/cli/index.js";
 import type {
   AgentRunResult,
   Clock,
+  InspectionEvent,
   ProcessRunRequest,
   ProcessRunResult,
   ProcessRunner,
@@ -649,6 +650,110 @@ test("CLI run creates a run workspace for a valid command", async () => {
     ),
     ".\nREADME.md\npackage.json\n",
   );
+});
+
+test("runtime emits structured inspection events for a successful CLI run", async () => {
+  const fixture = await createFixture();
+  const events: InspectionEvent[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    events: {
+      emit: (event) => {
+        events.push(event);
+      },
+    },
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(events[0], {
+    type: "run.started",
+    runId: "2026-06-20T01-02-03-004Z_target-repo",
+    repoPath: fixture.repoPath,
+    docsPath: `${fixture.repoPath}/docs/inspector`,
+    dataPath: join(fixture.outPath, "2026-06-20T01-02-03-004Z_target-repo"),
+  });
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "agent.started")
+      .map((event) => event.agentId),
+    [
+      "scout",
+      "architecture",
+      "pattern_miner",
+      "flow_tracer",
+      "testing_strategy",
+      "tradeoff_analyst",
+    ],
+  );
+  assert.equal(
+    events.filter((event) => event.type === "agent.schema.passed").length,
+    6,
+  );
+  assert.equal(
+    events.filter((event) => event.type === "agent.evidence.passed").length,
+    6,
+  );
+  assert.deepEqual(
+    events.find((event) => event.type === "qa.completed"),
+    { type: "qa.completed", approved: 6, rejected: 0, issues: 0 },
+  );
+  assert.equal(
+    events.some(
+      (event) =>
+        event.type === "docs.written" &&
+        event.path === `${fixture.repoPath}/docs/inspector`,
+    ),
+    true,
+  );
+  assert.equal(events.at(-1)?.type, "run.completed");
+});
+
+test("runtime emits structured failure events when an agent fails validation", async () => {
+  const fixture = await createFixture();
+  const events: InspectionEvent[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({ results: [successfulScoutResult("{}")] }),
+    events: {
+      emit: (event) => {
+        events.push(event);
+      },
+    },
+    stdout: () => undefined,
+    stderr: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(
+    events.some(
+      (event) =>
+        event.type === "agent.failed" &&
+        event.agentId === "scout" &&
+        /required property/.test(event.reason),
+    ),
+    true,
+  );
+  assert.equal(events.at(-1)?.type, "run.failed");
 });
 
 test("CLI run writes public Markdown docs under the target repository", async () => {
@@ -2523,7 +2628,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
   );
 });
 
-test("CLI run prints verbose progress and Scout streaming output", async () => {
+test("CLI run prints verbose progress and structured agent activity", async () => {
   const fixture = await createFixture();
   const stdout: string[] = [];
 
@@ -2563,18 +2668,71 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.equal(result.exitCode, 0);
   assert.match(stdout.join("\n"), /Run workspace creation started/);
   assert.match(stdout.join("\n"), /Repository indexing started/);
-  assert.match(stdout.join("\n"), /\[scout:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Agent activity: scout - Scout started/);
   assert.match(stdout.join("\n"), /Agent started: Architecture/);
-  assert.match(stdout.join("\n"), /\[architecture:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Agent activity: architecture - Scout started/);
   assert.match(stdout.join("\n"), /Agent started: Pattern Miner/);
-  assert.match(stdout.join("\n"), /\[pattern_miner:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Agent activity: pattern_miner - Scout started/);
   assert.match(stdout.join("\n"), /Agent started: Flow Tracer/);
-  assert.match(stdout.join("\n"), /\[flow_tracer:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Agent activity: flow_tracer - Scout started/);
   assert.match(stdout.join("\n"), /Agent started: Testing Strategy/);
-  assert.match(stdout.join("\n"), /\[testing_strategy:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Agent activity: testing_strategy - Scout started/);
   assert.match(stdout.join("\n"), /Agent started: Tradeoff Analyst/);
-  assert.match(stdout.join("\n"), /\[tradeoff_analyst:status\] Scout started/);
+  assert.match(
+    stdout.join("\n"),
+    /Agent activity: tradeoff_analyst - Scout started/,
+  );
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
+});
+
+test("CLI verbose output does not print raw agent stdout or stderr streams", async () => {
+  const fixture = await createFixture();
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+      "--verbose",
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(),
+        successfulTestingStrategyResult(),
+        successfulTradeoffAnalystResult(),
+      ].map((agentResult) => ({
+        ...agentResult,
+        streamingEvents: [
+          {
+            timestamp: "2026-06-20T01:02:04.500Z",
+            kind: "stdout" as const,
+            message: "RAW_MODEL_OUTPUT_SHOULD_NOT_PRINT",
+          },
+          {
+            timestamp: "2026-06-20T01:02:04.600Z",
+            kind: "stderr" as const,
+            message: "RAW_MODEL_ERROR_SHOULD_NOT_PRINT",
+          },
+        ],
+      })),
+    }),
+    stdout: (line) => stdout.push(line),
+  });
+
+  const output = stdout.join("\n");
+  assert.equal(result.exitCode, 0);
+  assert.doesNotMatch(output, /RAW_MODEL_OUTPUT_SHOULD_NOT_PRINT/);
+  assert.doesNotMatch(output, /RAW_MODEL_ERROR_SHOULD_NOT_PRINT/);
+  assert.match(output, /Agent activity: scout - Agent produced stdout output/);
+  assert.match(output, /Agent activity: scout - Agent produced stderr output/);
 });
 
 test("CLI run prints professional verbose inspection progress", async () => {

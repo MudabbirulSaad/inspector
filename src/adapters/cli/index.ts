@@ -16,6 +16,8 @@ import type { RunConfig } from "../../domain/types.js";
 import type {
   AgentRunner,
   Clock,
+  InspectionEvent,
+  InspectionEventSink,
   ProcessRunner,
   RunWorkspace,
 } from "../../ports/index.js";
@@ -53,6 +55,7 @@ export interface InspectorCliRequest {
   clock?: Clock;
   runner?: AgentRunner;
   processRunner?: ProcessRunner;
+  events?: InspectionEventSink;
   stdout?: (line: string) => void;
   stderr?: (line: string) => void;
 }
@@ -156,6 +159,11 @@ export async function runInspectorCli(
       ...(command.runner === undefined ? {} : { runner: command.runner }),
     };
 
+    const eventSink = createCliEventSink({
+      stdout,
+      verbose: command.verbose,
+      external: request.events,
+    });
     printProgress(stdout, command.verbose, `Inspection started: ${config.target.name}`);
     const result = await runScoutArchitectureInspection({
       config,
@@ -185,12 +193,8 @@ export async function runInspectorCli(
       processRunner,
       validators: await createSchemaContractValidators(),
       schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
+      events: eventSink,
       progress: (message) => printProgress(stdout, command.verbose, message),
-      stream: (agentId, kind, message) => {
-        if (command.verbose) {
-          stdout(`[${agentId}:${kind}] ${message}`);
-        }
-      },
     });
 
     printProgress(
@@ -295,6 +299,11 @@ async function resumeRunCommand(
   const processRunner = request.processRunner ?? new NodeProcessRunner();
 
   printProgress(stdout, config.verbose === true, `Resuming inspection: ${config.target.name}`);
+  const eventSink = createCliEventSink({
+    stdout,
+    verbose: config.verbose === true,
+    external: request.events,
+  });
   const result = await resumeScoutArchitectureInspection({
     config,
     objective,
@@ -326,12 +335,8 @@ async function resumeRunCommand(
     processRunner,
     validators: await createSchemaContractValidators(),
     schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
+    events: eventSink,
     progress: (message) => printProgress(stdout, config.verbose === true, message),
-    stream: (agentId, kind, message) => {
-      if (config.verbose === true) {
-        stdout(`[${agentId}:${kind}] ${message}`);
-      }
-    },
   });
   return { exitCode: 0, workspace: result.workspace };
 }
@@ -872,6 +877,35 @@ function printProgress(
 ): void {
   if (verbose) {
     stdout(message);
+  }
+}
+
+function createCliEventSink(input: {
+  stdout: (line: string) => void;
+  verbose: boolean;
+  external?: InspectionEventSink;
+}): InspectionEventSink {
+  return {
+    async emit(event) {
+      await input.external?.emit(event);
+      const line = renderInspectionEvent(event);
+      if (line !== undefined && input.verbose) {
+        input.stdout(line);
+      }
+    },
+  };
+}
+
+function renderInspectionEvent(event: InspectionEvent): string | undefined {
+  switch (event.type) {
+    case "agent.activity":
+      return `Agent activity: ${event.agentId} - ${event.message}`;
+    case "docs.written":
+      return `Final docs written: ${event.path}`;
+    case "rag.written":
+      return `RAG cards written: ${event.path}`;
+    default:
+      return undefined;
   }
 }
 

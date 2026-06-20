@@ -256,3 +256,33 @@ export interface ProcessRunResult {
 export interface ProcessRunner {
   run(request: ProcessRunRequest): Promise<ProcessRunResult>;
 }
+
+export type InspectionEvent =
+  | {
+      type: "run.started";
+      runId: string;
+      repoPath: string;
+      docsPath: string;
+      dataPath: string;
+    }
+  | { type: "stage.started"; stage: string; label: string }
+  | { type: "agent.started"; agentId: string; attempt: number; task: string }
+  | { type: "agent.activity"; agentId: string; message: string }
+  | { type: "agent.output.received"; agentId: string; attempt: number }
+  | { type: "agent.schema.passed"; agentId: string; attempt: number }
+  | {
+      type: "agent.evidence.passed";
+      agentId: string;
+      attempt: number;
+      citedFiles: number;
+    }
+  | { type: "agent.failed"; agentId: string; attempt: number; reason: string }
+  | { type: "qa.completed"; approved: number; rejected: number; issues: number }
+  | { type: "docs.written"; path: string }
+  | { type: "rag.written"; path: string }
+  | { type: "run.completed"; docsPath: string; dataPath: string }
+  | { type: "run.failed"; reason: string; dataPath?: string };
+
+export interface InspectionEventSink {
+  emit(event: InspectionEvent): void | Promise<void>;
+}

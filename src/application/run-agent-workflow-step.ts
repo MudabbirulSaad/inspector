@@ -66,6 +66,12 @@ export async function runAgentWorkflowStep(input: {
   });
 
   input.input.progress?.(`Agent started: ${input.progressName} (attempt ${attempt})`);
+  await input.input.events?.emit({
+    type: "agent.started",
+    agentId: input.agentId,
+    attempt,
+    task: input.progressName,
+  });
   lifecycle = await transitionAndWriteLifecycle({
     input: input.input,
     workspace: input.workspace,
@@ -81,6 +87,15 @@ export async function runAgentWorkflowStep(input: {
     workspaceRoot: input.workspace.root,
     onStreamingEvent: (event) => {
       input.input.stream?.(input.agentId, event.kind, event.message);
+      const message = summarizeAgentActivity(event.kind, event.message);
+      if (message.length > 0) {
+        return input.input.events?.emit({
+          type: "agent.activity",
+          agentId: input.agentId,
+          message,
+        });
+      }
+      return undefined;
     },
   });
 
@@ -95,6 +110,11 @@ export async function runAgentWorkflowStep(input: {
     workspace: input.workspace,
     lifecycle,
     to: "OUTPUT_RECEIVED",
+  });
+  await input.input.events?.emit({
+    type: "agent.output.received",
+    agentId: input.agentId,
+    attempt,
   });
   input.input.progress?.(`Agent finished: ${input.progressName} (attempt ${attempt})`);
 
@@ -118,7 +138,18 @@ export async function runAgentWorkflowStep(input: {
       lifecycle,
       to: "SCHEMA_VALIDATED",
     });
+    await input.input.events?.emit({
+      type: "agent.schema.passed",
+      agentId: input.agentId,
+      attempt,
+    });
   } else {
+    await input.input.events?.emit({
+      type: "agent.failed",
+      agentId: input.agentId,
+      attempt,
+      reason: validation.errors[0]?.message ?? "schema validation failed",
+    });
     lifecycle = await transitionAndWriteLifecycle({
       input: input.input,
       workspace: input.workspace,
@@ -143,9 +174,16 @@ export async function writeEvidenceLifecycleStatus(input: {
   workspace: RunWorkspace;
   lifecycle: AgentLifecycle;
   valid: boolean;
+  citedFiles?: number;
   reason?: string;
 }): Promise<AgentLifecycle> {
   if (input.valid) {
+    await input.input.events?.emit({
+      type: "agent.evidence.passed",
+      agentId: input.lifecycle.agentId,
+      attempt: input.lifecycle.attempts,
+      citedFiles: input.citedFiles ?? 0,
+    });
     return transitionAndWriteLifecycle({
       input: input.input,
       workspace: input.workspace,
@@ -154,6 +192,12 @@ export async function writeEvidenceLifecycleStatus(input: {
     });
   }
 
+  await input.input.events?.emit({
+    type: "agent.failed",
+    agentId: input.lifecycle.agentId,
+    attempt: input.lifecycle.attempts,
+    reason: input.reason ?? "evidence validation failed",
+  });
   const failedEvidence = await transitionAndWriteLifecycle({
     input: input.input,
     workspace: input.workspace,
@@ -168,6 +212,13 @@ export async function writeEvidenceLifecycleStatus(input: {
     to: "FAILED",
     reason: input.reason,
   });
+}
+
+function summarizeAgentActivity(kind: string, message: string): string {
+  if (kind === "stdout" || kind === "stderr") {
+    return `Agent produced ${kind} output`;
+  }
+  return message.trim().replace(/\s+/g, " ").slice(0, 200);
 }
 
 async function transitionAndWriteLifecycle(input: {

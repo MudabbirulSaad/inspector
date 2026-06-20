@@ -17,6 +17,7 @@ import type {
   CaseStudyDocumentWriter,
   Clock,
   EvidenceValidationReportWriter,
+  InspectionEventSink,
   PromptArtifactWriter,
   PromptTemplateReader,
   QaArtifactWriter,
@@ -98,6 +99,7 @@ export interface RunScoutArchitectureInspectionInput {
   processRunner: ProcessRunner;
   validators: SchemaContractValidators;
   schemaReader: AgentOutputSchemaReader;
+  events?: InspectionEventSink;
   progress?: (message: string) => void;
   stream?: (agentId: string, kind: string, message: string) => void;
 }
@@ -120,16 +122,30 @@ export async function runScoutArchitectureInspection(
 ): Promise<RunScoutArchitectureInspectionResult> {
   validateRuntimeConfig(input.config);
 
+  let workspace: RunWorkspace | undefined;
+  try {
   input.progress?.("Run workspace creation started");
-  const workspace = await createInspectionRunWorkspace({
+  workspace = await createInspectionRunWorkspace({
     config: input.config,
     clock: input.clock,
     workspaces: input.workspaces,
   });
   input.progress?.("Run workspace creation finished");
+  await input.events?.emit({
+    type: "run.started",
+    runId: workspace.name,
+    repoPath: input.config.target.root,
+    docsPath: publicDocsPath(input.config),
+    dataPath: workspace.root,
+  });
 
   const entries = await input.repositoryReader.listEntries();
 
+  await input.events?.emit({
+    type: "stage.started",
+    stage: "repository.indexing",
+    label: "Repository indexing",
+  });
   input.progress?.("Repository indexing started");
   await indexTargetRepository({
     target: input.config.target,
@@ -140,6 +156,11 @@ export async function runScoutArchitectureInspection(
   });
   input.progress?.("Repository indexing finished");
 
+  await input.events?.emit({
+    type: "stage.started",
+    stage: "validation.commands",
+    label: "Validation command execution",
+  });
   input.progress?.("Validation command execution started");
   const detectedCommands = await detectRepositoryCommands(
     input.repositoryReader,
@@ -164,6 +185,11 @@ export async function runScoutArchitectureInspection(
   const repoIndexSummary =
     await input.repositoryIndexContext.readRepositoryIndexPromptContext(workspace);
 
+  await input.events?.emit({
+    type: "stage.started",
+    stage: "memory.initializing",
+    label: "Initializing memory",
+  });
   input.progress?.("Initializing memory");
   const runMemory = input.memory(workspace);
   const memorySnapshot = renderInitialMemorySnapshot(input.objective);
@@ -218,6 +244,7 @@ export async function runScoutArchitectureInspection(
     workspace,
     lifecycle: scoutSchemaResult.lifecycle,
     valid: scoutEvidenceResult.valid,
+    citedFiles: countCitedFiles(scoutEvidence),
     reason: scoutEvidenceResult.errors[0]?.message,
   });
 
@@ -280,6 +307,7 @@ export async function runScoutArchitectureInspection(
     workspace,
     lifecycle: architectureSchemaResult.lifecycle,
     valid: architectureEvidenceResult.valid,
+    citedFiles: countCitedFiles(architectureEvidenceFindings(architectureOutput)),
     reason: architectureEvidenceResult.errors[0]?.message,
   });
 
@@ -342,6 +370,7 @@ export async function runScoutArchitectureInspection(
     workspace,
     lifecycle: patternMinerSchemaResult.lifecycle,
     valid: patternMinerEvidenceResult.valid,
+    citedFiles: countCitedFiles(patternMinerEvidenceFindings(patternMinerOutput)),
     reason: patternMinerEvidenceResult.errors[0]?.message,
   });
 
@@ -407,6 +436,7 @@ export async function runScoutArchitectureInspection(
     workspace,
     lifecycle: flowTracerSchemaResult.lifecycle,
     valid: flowTracerEvidenceResult.valid,
+    citedFiles: countCitedFiles(flowTracerEvidenceFindings(flowTracerOutput)),
     reason: flowTracerEvidenceResult.errors[0]?.message,
   });
 
@@ -476,6 +506,9 @@ export async function runScoutArchitectureInspection(
     workspace,
     lifecycle: testingStrategySchemaResult.lifecycle,
     valid: testingStrategyEvidenceResult.valid,
+    citedFiles: countCitedFiles(
+      testingStrategyEvidenceFindings(testingStrategyOutput),
+    ),
     reason: testingStrategyEvidenceResult.errors[0]?.message,
   });
 
@@ -544,6 +577,9 @@ export async function runScoutArchitectureInspection(
     workspace,
     lifecycle: tradeoffAnalystSchemaResult.lifecycle,
     valid: tradeoffAnalystEvidenceResult.valid,
+    citedFiles: countCitedFiles(
+      tradeoffAnalystEvidenceFindings(tradeoffAnalystOutput),
+    ),
     reason: tradeoffAnalystEvidenceResult.errors[0]?.message,
   });
 
@@ -565,6 +601,11 @@ export async function runScoutArchitectureInspection(
     });
   }
 
+  await input.events?.emit({
+    type: "stage.started",
+    stage: "qa.verification",
+    label: "QA verification",
+  });
   input.progress?.("Running QA verification");
   let qa = await verifyFindingsWithQa({
     candidateFindings,
@@ -627,6 +668,12 @@ export async function runScoutArchitectureInspection(
   input.progress?.(
     `QA verification passed: ${qa.approvedFindings.length} approved, ${qa.rejectedFindings.length} rejected`,
   );
+  await input.events?.emit({
+    type: "qa.completed",
+    approved: qa.approvedFindings.length,
+    rejected: qa.rejectedFindings.length,
+    issues: qa.qaIssues.length,
+  });
 
   for (const finding of qa.approvedFindings) {
     await appendVerifiedSwarmFinding({
@@ -654,9 +701,13 @@ export async function runScoutArchitectureInspection(
     qaResults: qa.qaResults,
     generatedAt: input.clock.now(),
   });
+  await input.events?.emit({
+    type: "docs.written",
+    path: publicDocsPath(input.config),
+  });
 
   input.progress?.("Writing final RAG knowledge cards");
-  await generateRagKnowledgeCards({
+  const rag = await generateRagKnowledgeCards({
     workspace,
     writer: input.ragCards,
     repository: input.config.target,
@@ -665,8 +716,26 @@ export async function runScoutArchitectureInspection(
     validator: input.validators["knowledge-card"],
     generatedAt: input.clock.now(),
   });
+  await input.events?.emit({
+    type: "rag.written",
+    path: rag.paths.patterns.path,
+  });
 
+  await input.events?.emit({
+    type: "run.completed",
+    docsPath: publicDocsPath(input.config),
+    dataPath: workspace.root,
+  });
   return { workspace };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    await input.events?.emit({
+      type: "run.failed",
+      reason,
+      ...(workspace === undefined ? {} : { dataPath: workspace.root }),
+    });
+    throw error;
+  }
 }
 
 const implementedSpecialistSequence = [
@@ -732,4 +801,16 @@ export async function validateEvidenceForAgent(input: {
   });
 
   return result;
+}
+
+function countCitedFiles(findings: Finding[]): number {
+  return new Set(
+    findings.flatMap((finding) =>
+      finding.evidence.map((evidence) => evidence.file),
+    ),
+  ).size;
+}
+
+function publicDocsPath(config: RunConfig): string {
+  return `${config.target.root}/docs/inspector`;
 }
