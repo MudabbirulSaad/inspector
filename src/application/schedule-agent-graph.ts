@@ -19,6 +19,11 @@ export interface ScheduleAgentGraphResult {
   blockedAgentIds: AgentContractId[];
 }
 
+interface RunningAgentResult {
+  contract: AgentContract;
+  result: ScheduledAgentRunResult;
+}
+
 export async function scheduleAgentGraph(
   request: ScheduleAgentGraphRequest,
 ): Promise<ScheduleAgentGraphResult> {
@@ -35,10 +40,7 @@ export async function scheduleAgentGraph(
     request.agents.map((contract) => [contract.id, contract]),
   );
   const pending = [...request.agents];
-  const running = new Map<
-    AgentContractId,
-    Promise<{ contract: AgentContract; result: ScheduledAgentRunResult }>
-  >();
+  const running = new Map<AgentContractId, Promise<RunningAgentResult>>();
 
   while (pending.length > 0 || running.size > 0) {
     let launched = false;
@@ -67,7 +69,7 @@ export async function scheduleAgentGraph(
       pending.splice(index, 1);
       running.set(
         contract.id,
-        request.runAgent(contract).then((result) => ({ contract, result })),
+        runScheduledAgent(request, contract),
       );
       launched = true;
     }
@@ -101,4 +103,22 @@ export async function scheduleAgentGraph(
     failedAgentIds,
     blockedAgentIds,
   };
+}
+
+async function runScheduledAgent(
+  request: ScheduleAgentGraphRequest,
+  contract: AgentContract,
+): Promise<RunningAgentResult> {
+  try {
+    const result = await request.runAgent(contract);
+    return { contract, result };
+  } catch (error) {
+    return {
+      contract,
+      result: {
+        status: "failed",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
 }

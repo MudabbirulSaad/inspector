@@ -142,6 +142,24 @@ test("scheduler blocks dependents when a required dependency fails", async () =>
   assert.deepEqual(result.blockedAgentIds, ["architecture"]);
 });
 
+test("scheduler treats thrown required agent errors as failed agent results", async () => {
+  const result = await scheduleAgentGraph({
+    agents: [agent("scout"), agent("architecture", ["scout"])],
+    maxParallelism: 2,
+    runAgent: async (contract) => {
+      if (contract.id === "scout") {
+        throw new Error("runner crashed");
+      }
+
+      return { status: "succeeded" };
+    },
+  });
+
+  assert.deepEqual(result.completedAgentIds, []);
+  assert.deepEqual(result.failedAgentIds, ["scout"]);
+  assert.deepEqual(result.blockedAgentIds, ["architecture"]);
+});
+
 test("scheduler allows safe continuation when optional dependencies fail", async () => {
   const started: string[] = [];
 
@@ -163,6 +181,27 @@ test("scheduler allows safe continuation when optional dependencies fail", async
   });
 
   assert.deepEqual(started, ["flow_tracer", "final_reviewer"]);
+  assert.deepEqual(result.completedAgentIds, ["final_reviewer"]);
+  assert.deepEqual(result.failedAgentIds, ["flow_tracer"]);
+  assert.deepEqual(result.blockedAgentIds, []);
+});
+
+test("scheduler allows continuation when an optional dependency throws", async () => {
+  const result = await scheduleAgentGraph({
+    agents: [
+      agent("flow_tracer", [], false),
+      agent("final_reviewer", ["flow_tracer"]),
+    ],
+    maxParallelism: 2,
+    runAgent: async (contract) => {
+      if (contract.id === "flow_tracer") {
+        throw new Error("runner crashed");
+      }
+
+      return { status: "succeeded" };
+    },
+  });
+
   assert.deepEqual(result.completedAgentIds, ["final_reviewer"]);
   assert.deepEqual(result.failedAgentIds, ["flow_tracer"]);
   assert.deepEqual(result.blockedAgentIds, []);
