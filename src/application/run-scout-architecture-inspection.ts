@@ -18,6 +18,7 @@ import type {
   PromptArtifactWriter,
   PromptTemplateReader,
   QaArtifactWriter,
+  RagKnowledgeCardWriter,
   RepositoryEntry,
   RepositoryIndexPromptContextReader,
   RepositoryIndexWriter,
@@ -39,6 +40,7 @@ import { buildAgentPrompt } from "./build-agent-prompt.js";
 import { createInspectionRunWorkspace } from "./create-inspection-run-workspace.js";
 import { executeAgentRun } from "./execute-agent-run.js";
 import { generateCaseStudyDocumentation } from "./generate-case-study-documentation.js";
+import { generateRagKnowledgeCards } from "./generate-rag-knowledge-cards.js";
 import { indexTargetRepository } from "./index-target-repository.js";
 import { validateAgentOutput } from "./validate-agent-output.js";
 import {
@@ -69,6 +71,7 @@ export interface RunScoutArchitectureInspectionInput {
   evidenceReports: EvidenceValidationReportWriter;
   qaArtifacts: QaArtifactWriter;
   finalDocs: CaseStudyDocumentWriter;
+  ragCards: RagKnowledgeCardWriter;
   validators: SchemaContractValidators;
   schemaReader: AgentOutputSchemaReader;
   progress?: (message: string) => void;
@@ -351,6 +354,17 @@ export async function runScoutArchitectureInspection(
     approvedFindings: qa.approvedFindings,
     rejectedFindings: qa.rejectedFindings,
     qaResults: qa.qaResults,
+    generatedAt: input.clock.now(),
+  });
+
+  input.progress?.("Writing final RAG knowledge cards");
+  await generateRagKnowledgeCards({
+    workspace,
+    writer: input.ragCards,
+    repository: input.config.target,
+    approvedFindings: qa.approvedFindings,
+    rejectedFindings: qa.rejectedFindings,
+    validator: input.validators["knowledge-card"],
     generatedAt: input.clock.now(),
   });
 

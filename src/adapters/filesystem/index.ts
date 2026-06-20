@@ -10,6 +10,8 @@ import type {
   PromptArtifactWriter,
   PromptTemplateReader,
   QaArtifactWriter,
+  RagKnowledgeCardStream,
+  RagKnowledgeCardWriter,
   RepositoryEntry,
   RepositoryIndexPromptContextReader,
   RepositoryIndexWriter,
@@ -337,6 +339,41 @@ export class NodeCaseStudyDocumentWriter implements CaseStudyDocumentWriter {
     await mkdir(directory, { recursive: true });
     await writeFile(path, request.content);
 
+    return { path };
+  }
+}
+
+export class NodeRagKnowledgeCardWriter implements RagKnowledgeCardWriter {
+  async writeRagKnowledgeCards(request: {
+    workspace: RunWorkspace;
+    streams: Record<RagKnowledgeCardStream, string>;
+  }): Promise<Record<RagKnowledgeCardStream, { path: string }>> {
+    const directory = join(request.workspace.folders.final, "rag_cards");
+    await mkdir(directory, { recursive: true });
+
+    return {
+      patterns: await this.writeStream(directory, "patterns.jsonl", request.streams.patterns),
+      flows: await this.writeStream(directory, "flows.jsonl", request.streams.flows),
+      decisions: await this.writeStream(
+        directory,
+        "decisions.jsonl",
+        request.streams.decisions,
+      ),
+      warnings: await this.writeStream(
+        directory,
+        "warnings.jsonl",
+        request.streams.warnings,
+      ),
+    };
+  }
+
+  private async writeStream(
+    directory: string,
+    filename: string,
+    content: string,
+  ): Promise<{ path: string }> {
+    const path = join(directory, filename);
+    await writeFile(path, content);
     return { path };
   }
 }

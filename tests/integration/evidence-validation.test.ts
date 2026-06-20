@@ -248,6 +248,8 @@ test("evidence validator rejects knowledge card evidence that references unappro
     id: "knowledge-card-001",
     topic: "Application orchestration",
     summary: "Keep workflow behavior in application services.",
+    sourceRepo: "inspector",
+    confidence: 0.8,
     tags: ["architecture"],
     audience: "coding-agent",
     evidence: [

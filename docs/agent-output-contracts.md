@@ -12,7 +12,7 @@ consistent across artifacts.
 
 ## Finding
 
-`finding.schema.json` describes an inspection finding. It requires an agent name, severity, claim, evidence, recommendation, and confidence score. Evidence must include at least one file path and line range.
+`finding.schema.json` describes an inspection finding. It requires an agent name, severity, claim, evidence, recommendation, and confidence score. Evidence must include at least one file path and line range. Findings may also carry optional RAG-card metadata such as tags, audience, card type, usage guidance, risks, and adaptation notes.
 
 ## Scout Output
 
@@ -54,7 +54,12 @@ outputs.
 
 ## Knowledge Card
 
-`knowledge-card.schema.json` captures reusable knowledge for future agents. Cards include a topic, summary, evidence links, tags, and an intended audience.
+`knowledge-card.schema.json` captures reusable knowledge for future agents.
+Cards include one idea with a topic, summary, source repository, confidence,
+evidence links, tags, and intended audience. Optional usage guidance,
+non-usage guidance, risks, and adaptation notes can be included when the
+approved finding provides them. Runtime RAG cards are written as JSONL streams
+under `final/rag_cards/` and must validate before they are written.
 
 ## Memory Event
 
@@ -83,8 +88,8 @@ aligned with these schemas.
 The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
 validators for Scout output, Architecture output, findings, QA results,
-Pattern Miner output, knowledge cards, memory events, and inspection reports
-without duplicating schema definitions in TypeScript.
+Pattern Miner output, knowledge cards, memory events, QA issues, and
+inspection reports without duplicating schema definitions in TypeScript.
 
 ## Agent Output Validation
 

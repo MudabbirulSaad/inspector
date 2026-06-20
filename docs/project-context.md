@@ -73,8 +73,12 @@ memory, rerun QA, and leave unresolved final revision requests visible when the
 retry policy is exhausted. The final case-study writer now emits the fixed
 `final/docs/` Markdown package from QA-approved findings only, excludes rejected
 findings, preserves file and line evidence chains, and marks unsupported
-sections with insufficient-evidence language. Full scheduler-driven multi-agent
-orchestration is still pending.
+sections with insufficient-evidence language. The RAG knowledge card writer now
+emits schema-valid `final/rag_cards/{patterns,flows,decisions,warnings}.jsonl`
+streams from QA-approved findings only, excludes rejected findings, preserves
+finding evidence references and tags, and records source repository plus
+confidence metadata. Full scheduler-driven multi-agent orchestration is still
+pending.
 
 ## Non-Goals
 

@@ -108,6 +108,8 @@ test("domain models can construct a schema-aligned inspection run", () => {
     topic: "Keep CLI adapters thin",
     summary:
       "CLI entrypoints should translate user input and delegate workflow decisions to application services.",
+    sourceRepo: target.name,
+    confidence: finding.confidence,
     evidence: [
       {
         file: "docs/architecture.md",

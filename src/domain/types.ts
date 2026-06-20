@@ -59,6 +59,13 @@ export interface Finding {
   recommendation: string;
   confidence: number;
   validation?: string[];
+  tags?: string[];
+  cardType?: "pattern" | "flow" | "decision" | "warning";
+  audience?: KnowledgeCardAudience;
+  whenToUse?: string;
+  whenNotToUse?: string;
+  risks?: string;
+  adaptationNotes?: string;
 }
 
 export interface ScoutEvidenceSummary {
@@ -182,9 +189,15 @@ export interface KnowledgeCard {
   id: string;
   topic: string;
   summary: string;
+  sourceRepo: string;
+  confidence: number;
   evidence: Evidence[];
   tags: string[];
   audience: KnowledgeCardAudience;
+  whenToUse?: string;
+  whenNotToUse?: string;
+  risks?: string;
+  adaptationNotes?: string;
   createdAt?: string;
 }
 

@@ -156,6 +156,19 @@ export interface CaseStudyDocumentWriter {
   ): Promise<{ path: string }>;
 }
 
+export type RagKnowledgeCardStream =
+  | "patterns"
+  | "flows"
+  | "decisions"
+  | "warnings";
+
+export interface RagKnowledgeCardWriter {
+  writeRagKnowledgeCards(request: {
+    workspace: RunWorkspace;
+    streams: Record<RagKnowledgeCardStream, string>;
+  }): Promise<Record<RagKnowledgeCardStream, { path: string }>>;
+}
+
 export interface AgentOutputSchemaReader {
   readAgentOutputSchema(contract: string): Promise<unknown>;
 }

@@ -49,6 +49,8 @@
       "id": "knowledge-card-001",
       "topic": "Keep CLI adapters thin",
       "summary": "CLI entrypoints should translate user input and delegate workflow decisions to application services.",
+      "sourceRepo": "example-service",
+      "confidence": 0.82,
       "evidence": [
         {
           "file": "docs/architecture.md",
@@ -59,6 +61,9 @@
       ],
       "tags": ["architecture", "cli", "hexagonal"],
       "audience": "coding-agent",
+      "whenToUse": "When adding CLI behavior that should delegate workflow decisions.",
+      "whenNotToUse": "When implementing pure domain model behavior.",
+      "adaptationNotes": "Keep user input translation near the adapter boundary.",
       "createdAt": "2026-06-20T02:00:00.000Z"
     }
   ],

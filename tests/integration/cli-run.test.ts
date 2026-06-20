@@ -635,6 +635,26 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
     ),
     /Approved findings used: 3/,
   );
+  const patternCards = await readFile(
+    join(workspaceRoot, "final", "rag_cards", "patterns.jsonl"),
+    "utf8",
+  );
+  const warningCards = await readFile(
+    join(workspaceRoot, "final", "rag_cards", "warnings.jsonl"),
+    "utf8",
+  );
+  const decisionCards = await readFile(
+    join(workspaceRoot, "final", "rag_cards", "decisions.jsonl"),
+    "utf8",
+  );
+
+  assert.match(patternCards, /rag-card-finding-pattern-miner-001/);
+  assert.match(warningCards, /rag-card-finding-architecture-001/);
+  assert.match(decisionCards, /rag-card-finding-scout-001/);
+  assert.equal(
+    JSON.parse(patternCards.trim().split("\n")[0] ?? "{}").sourceRepo,
+    "target-repo",
+  );
 });
 
 test("CLI run routes QA revisions only to the owner agent and preserves attempts", async () => {

@@ -115,11 +115,12 @@ Adapter responsibilities include:
   agent, routed only to that owner as the next attempt, revalidated against the
   owner schema and evidence rules, and followed by final QA so unresolved issues
   remain visible in QA artifacts when retries are exhausted. The use case then
-  writes the fixed `final/docs/` case-study Markdown package from the final
-  approved findings. Shared application step logic handles prompt construction,
-  runner execution, output persistence, and schema validation for these agents.
-  It remains a linear early runtime slice until the full scheduler-driven
-  orchestration flow is wired.
+  writes the fixed `final/docs/` case-study Markdown package and
+  `final/rag_cards/` JSONL package from the final approved findings. Shared
+  application step logic handles prompt construction, runner execution, output
+  persistence, and schema validation for these agents. It remains a linear
+  early runtime slice until the full scheduler-driven orchestration flow is
+  wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
@@ -287,8 +288,11 @@ that there is not enough verified evidence when a section has no approved
 support.
 
 RAG-ready knowledge cards should be compact, evidence-linked JSON artifacts for
-future coding agents. They must preserve references back to validated findings
-and source file ranges.
+future coding agents. The runtime writer emits `patterns.jsonl`, `flows.jsonl`,
+`decisions.jsonl`, and `warnings.jsonl` under `final/rag_cards/`. Cards must
+preserve references back to validated findings and source file ranges, carry
+source repository and confidence metadata, preserve tags, and exclude rejected
+findings.
 
 Only accepted findings and QA results may enter final case-study docs,
 inspection reports, or knowledge cards.

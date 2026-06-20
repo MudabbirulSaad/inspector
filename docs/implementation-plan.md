@@ -29,7 +29,7 @@ contract-first baseline:
 Runtime CLI implementation has started with a Scout, Architecture, Pattern
 Miner, QA, and final case-study documentation `inspector run` vertical slice.
 Full scheduler-driven orchestration services, real Codex runner configuration,
-RAG-card generation, and inspection-report writers are still pending.
+and inspection-report writers are still pending.
 Filesystem adapters now exist for auditable run workspace creation,
 deterministic repository indexing, append-only run memory, prompt template
 loading, and prompt artifact writing. Runner ports now exist with deterministic
@@ -45,7 +45,10 @@ evidence, QA finding references, and knowledge-card approved-finding
 references. Final case-study documentation now writes the fixed Markdown
 package under `final/docs/` from QA-approved findings only, excludes rejected
 findings, and marks unsupported sections with explicit insufficient-evidence
-language.
+language. RAG card generation now writes schema-valid JSONL streams under
+`final/rag_cards/` from QA-approved findings only, excludes rejected findings,
+preserves evidence links back to source finding ids, and carries tags plus
+optional usage, risk, and adaptation notes.
 
 ## Fixed Milestones
 
@@ -1129,4 +1132,48 @@ git status
 
 ```bash
 feat(writers): generate verified case study documentation
+```
+
+### Milestone 25: RAG Knowledge Card Distiller
+
+#### Goal
+
+Generate RAG-ready knowledge cards from approved findings.
+
+#### Tasks
+
+- Expanded the knowledge-card contract with source repository, confidence, and
+  optional when-to-use, when-not-to-use, risks, and adaptation notes fields.
+- Added optional finding metadata for RAG card tags, audience, card type, and
+  usage/adaptation notes while preserving the existing required finding shape.
+- Added a `RagKnowledgeCardWriter` port and filesystem adapter that writes the
+  fixed JSONL package under `final/rag_cards/`: `patterns.jsonl`,
+  `flows.jsonl`, `decisions.jsonl`, and `warnings.jsonl`.
+- Added `generateRagKnowledgeCards` in the application layer to distill one
+  idea per approved finding, preserve evidence with finding ids, preserve tags,
+  validate every card before writing, and exclude rejected findings.
+- Wired RAG card generation into the current Scout/Architecture/Pattern Miner
+  plus QA runtime use case after final QA and case-study documentation.
+
+#### TDD
+
+Added integration tests for approved-to-card conversion, rejected finding
+exclusion, invalid card failure before writing, evidence preservation, tag
+preservation, valid JSONL parsing, all four output streams, and CLI runtime
+RAG-card output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(writers): generate RAG knowledge cards
 ```
