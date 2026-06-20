@@ -1,0 +1,24 @@
+{
+  "$id": "memory-event.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memory Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "timestamp", "actor", "type", "summary"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "actor": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["decision", "milestone", "validation", "finding", "qa", "note"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "relatedFiles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "nextSteps": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

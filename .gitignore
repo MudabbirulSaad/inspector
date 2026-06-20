@@ -1,0 +1,25 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local AI / agent operational state
+.agents/memory.md
+.agents/state/
+.agent-context.md
+agent-memory.md
+prompt-history.md
+raw-prompts/
+agent-logs/
+transcripts/
+scratchpad.md
+
+# Tool caches
+.cache/
+.tmp/
+.DS_Store

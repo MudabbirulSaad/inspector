@@ -1,0 +1,17 @@
+{
+  "id": "finding-001",
+  "agent": "architecture-inspector",
+  "severity": "medium",
+  "claim": "The CLI entrypoint should delegate orchestration to an application service instead of owning workflow logic directly.",
+  "evidence": [
+    {
+      "file": "src/adapters/cli/main.ts",
+      "lineStart": 12,
+      "lineEnd": 20,
+      "excerpt": "The entrypoint parses input and starts inspection orchestration."
+    }
+  ],
+  "recommendation": "Keep CLI parsing in the adapter layer and move orchestration decisions behind an application port.",
+  "confidence": 0.82,
+  "validation": ["schema-valid", "evidence-present"]
+}

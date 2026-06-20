@@ -1,0 +1,144 @@
+{
+  "$id": "inspection-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Inspection Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "repository", "generatedAt", "summary", "findings", "qaResults", "knowledgeCards", "validation"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "root"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "root": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "minLength": 1 }
+      }
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "summary": { "type": "string", "minLength": 1 },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "qaResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/qaResult" }
+    },
+    "knowledgeCards": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/knowledgeCard" }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "commands"],
+      "properties": {
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command", "status"],
+            "properties": {
+              "command": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["passed", "failed", "not-run"] },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "lineStart", "lineEnd"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "lineStart": { "type": "integer", "minimum": 1 },
+        "lineEnd": { "type": "integer", "minimum": 1 },
+        "excerpt": { "type": "string" },
+        "findingId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "agent", "severity", "claim", "evidence", "recommendation", "confidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "agent": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["info", "low", "medium", "high", "critical"] },
+        "claim": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "recommendation": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "validation": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "qaResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "qaAgent", "findingId", "status", "rationale", "checks", "requiresFollowUp"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "qaAgent": { "type": "string", "minLength": 1 },
+        "findingId": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed", "needs-review"] },
+        "rationale": { "type": "string", "minLength": 1 },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "status"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["passed", "failed", "needs-review"] },
+              "notes": { "type": "string" }
+            }
+          }
+        },
+        "requiresFollowUp": { "type": "boolean" },
+        "followUpAgent": { "type": "string", "minLength": 1 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "knowledgeCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "topic", "summary", "evidence", "tags", "audience"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "topic": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "audience": { "enum": ["coding-agent", "engineer", "maintainer"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

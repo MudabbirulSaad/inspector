@@ -1,0 +1,16 @@
+{
+  "id": "knowledge-card-001",
+  "topic": "Keep CLI adapters thin",
+  "summary": "CLI entrypoints should translate user input and delegate workflow decisions to application services.",
+  "evidence": [
+    {
+      "file": "docs/architecture.md",
+      "lineStart": 20,
+      "lineEnd": 27,
+      "findingId": "finding-001"
+    }
+  ],
+  "tags": ["architecture", "cli", "hexagonal"],
+  "audience": "coding-agent",
+  "createdAt": "2026-06-20T02:00:00.000Z"
+}

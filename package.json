@@ -1,0 +1,20 @@
+{
+  "name": "inspector",
+  "version": "0.1.0",
+  "description": "CLI for orchestrating Codex-powered codebase inspection swarms.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:watch": "node --test --watch tests/*.test.mjs",
+    "validate": "npm test"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "npm@11.16.0",
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "memory-event-001",
+  "timestamp": "2026-06-20T02:00:00.000Z",
+  "actor": "workflow-agent",
+  "type": "decision",
+  "summary": "Adopted JSON Schema contracts for evidence-backed agent outputs.",
+  "relatedFiles": [
+    "schemas/finding.schema.json",
+    "docs/agent-output-contracts.md"
+  ],
+  "nextSteps": [
+    "Validate generated findings against the published schema."
+  ]
+}

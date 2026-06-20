@@ -1,0 +1,75 @@
+{
+  "id": "inspection-report-001",
+  "repository": {
+    "name": "example-service",
+    "root": "./example-service",
+    "commit": "abc1234"
+  },
+  "generatedAt": "2026-06-20T02:00:00.000Z",
+  "summary": "The inspection identified one architecture improvement and verified that the finding includes traceable evidence.",
+  "findings": [
+    {
+      "id": "finding-001",
+      "agent": "architecture-inspector",
+      "severity": "medium",
+      "claim": "The CLI entrypoint should delegate orchestration to an application service instead of owning workflow logic directly.",
+      "evidence": [
+        {
+          "file": "src/adapters/cli/main.ts",
+          "lineStart": 12,
+          "lineEnd": 20,
+          "excerpt": "The entrypoint parses input and starts inspection orchestration."
+        }
+      ],
+      "recommendation": "Keep CLI parsing in the adapter layer and move orchestration decisions behind an application port.",
+      "confidence": 0.82,
+      "validation": ["schema-valid", "evidence-present"]
+    }
+  ],
+  "qaResults": [
+    {
+      "id": "qa-001",
+      "qaAgent": "qa-inspector",
+      "findingId": "finding-001",
+      "status": "passed",
+      "rationale": "The finding includes a clear architecture claim, traceable evidence, and an actionable recommendation.",
+      "checks": [
+        {
+          "name": "evidence-present",
+          "status": "passed",
+          "notes": "File path and line range are present."
+        }
+      ],
+      "requiresFollowUp": false,
+      "createdAt": "2026-06-20T02:00:00.000Z"
+    }
+  ],
+  "knowledgeCards": [
+    {
+      "id": "knowledge-card-001",
+      "topic": "Keep CLI adapters thin",
+      "summary": "CLI entrypoints should translate user input and delegate workflow decisions to application services.",
+      "evidence": [
+        {
+          "file": "docs/architecture.md",
+          "lineStart": 20,
+          "lineEnd": 27,
+          "findingId": "finding-001"
+        }
+      ],
+      "tags": ["architecture", "cli", "hexagonal"],
+      "audience": "coding-agent",
+      "createdAt": "2026-06-20T02:00:00.000Z"
+    }
+  ],
+  "validation": {
+    "schemaVersion": "2020-12",
+    "commands": [
+      {
+        "command": "npm test",
+        "status": "passed",
+        "notes": "Schema examples validated."
+      }
+    ]
+  }
+}
