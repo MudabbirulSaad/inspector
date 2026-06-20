@@ -26,7 +26,7 @@ Implementation should proceed through TDD-driven vertical slices. Each milestone
 
 ## Current State
 
-The repository currently contains governance documentation, JSON Schemas, examples, and schema/example validation tests. Runtime CLI implementation, TypeScript source, and build tooling are still pending.
+The repository currently contains governance documentation, JSON Schemas, examples, schema/example validation tests, TypeScript configuration, and initial domain contract interfaces. Runtime CLI implementation and lint tooling are still pending.
 
 ## Non-Goals
 

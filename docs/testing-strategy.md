@@ -14,7 +14,11 @@ Adapters should be tested with fakes or controlled fixtures. Filesystem, process
 
 ## Contract Tests
 
-JSON Schema tests validate that example outputs match the published contracts. Future agent outputs should be checked against the same schemas before they are accepted into reports or memory.
+JSON Schema tests validate that example outputs match the published contracts, including external schema references. Future agent outputs should be checked against the same schemas before they are accepted into reports or memory.
+
+## Type Checking
+
+Domain contract interfaces in `src/domain/types.ts` should mirror the JSON Schema contracts. Run `npm run typecheck` after changing schemas or domain types.
 
 ## CLI Behavior Tests
 

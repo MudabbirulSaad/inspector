@@ -15,11 +15,18 @@ const contracts = [
 test("agent output examples validate against their JSON schemas", async () => {
   const ajv = new Ajv2020({ allErrors: true });
   addFormats(ajv);
+  const schemas = new Map();
 
   for (const contract of contracts) {
     const schema = JSON.parse(
       await readFile(`schemas/${contract}.schema.json`, "utf8"),
     );
+    schemas.set(contract, schema);
+    ajv.addSchema(schema);
+  }
+
+  for (const contract of contracts) {
+    const schema = schemas.get(contract);
     const example = JSON.parse(
       await readFile(`examples/${contract}.example.json`, "utf8"),
     );
