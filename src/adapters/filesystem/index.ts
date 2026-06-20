@@ -2,6 +2,8 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+  PromptArtifactWriter,
+  PromptTemplateReader,
   RepositoryEntry,
   RepositoryIndexWriter,
   RepositoryReader,
@@ -144,6 +146,39 @@ export class NodeSwarmMemoryStore implements SwarmMemoryStore {
     for (const file of allMemoryFiles) {
       await writeFile(join(this.workspace.folders.memory, file), "", { flag: "a" });
     }
+  }
+}
+
+export class NodePromptTemplateReader implements PromptTemplateReader {
+  constructor(private readonly promptRoot: string) {}
+
+  async readTemplate(path: string): Promise<string> {
+    try {
+      return await readFile(join(this.promptRoot, path), "utf8");
+    } catch (error) {
+      throw new Error(`Prompt template not found: ${path}`, { cause: error });
+    }
+  }
+}
+
+export class NodePromptArtifactWriter implements PromptArtifactWriter {
+  async writeAgentPrompt(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.agents,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "prompt.md");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
   }
 }
 

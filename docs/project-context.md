@@ -35,7 +35,10 @@ deterministic repository indexer that emits `repo_index/` artifacts including
 stack and quality-command detection. It also includes an append-only run memory
 store for swarm events, decisions, findings, QA issues, verified/rejected
 findings, and blackboard snapshots, plus a fixed agent registry for V1 and later
-inspection agent contracts. Runtime CLI behavior is still pending.
+inspection agent contracts. It now has auditable prompt templates for required
+V1 agents, plus application and filesystem ports that build exact agent prompts
+from run context and save those prompts under the run workspace. Runtime CLI
+behavior is still pending.
 
 ## Non-Goals
 

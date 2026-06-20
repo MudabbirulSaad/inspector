@@ -71,3 +71,16 @@ export interface ValidationPortResult {
 export interface ArtifactValidator<T> {
   validate(value: unknown): ValidationPortResult & { value?: T };
 }
+
+export interface PromptTemplateReader {
+  readTemplate(path: string): Promise<string>;
+}
+
+export interface PromptArtifactWriter {
+  writeAgentPrompt(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }>;
+}

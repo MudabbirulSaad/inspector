@@ -66,3 +66,13 @@ schema, retry policy, required/optional policy, and QA revision ownership.
 The required V1 agents are `scout`, `architecture`, `pattern_miner`,
 `qa_verifier`, and `final_reviewer`. Later optional agents are `flow_tracer`,
 `testing_strategy`, `tradeoff_analyst`, and `rag_card_distiller`.
+
+## Prompt Templates
+
+Auditable prompt source templates live under `prompts/`. Shared rules are in
+`prompts/shared/`, and required V1 agent templates are in `prompts/agents/`.
+The application prompt builder injects objective, target repository context,
+repository index summary, previous outputs, memory snapshot, output schema,
+evidence rules, and revision request context for retry attempts. The exact
+assembled prompt is saved in the run workspace under
+`agents/<agent-id>/attempt-<n>/prompt.md`.

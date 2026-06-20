@@ -74,6 +74,9 @@ Application responsibilities include:
 - Appending schema-valid swarm memory artifacts into the current run workspace
   through memory ports.
 - Building the repository inspection plan from indexed repository metadata.
+- Building auditable agent prompts from versioned templates, repository context,
+  index summaries, previous outputs, memory snapshots, output schemas, evidence
+  rules, and retry revision requests.
 - Dispatching specialist agents only when their dependencies are satisfied.
 - Accepting only schema-valid and evidence-backed findings.
 - Creating revision requests for failed QA and routing them to the responsible
@@ -103,6 +106,9 @@ Adapter responsibilities include:
 - Memory adapters persist local swarm events without exposing raw prompts,
   transcripts, secrets, or private state in public docs. Run memory is
   append-only and lives under the run workspace `memory/` folder.
+- Prompt adapters load versioned templates from `prompts/` and write the exact
+  prompt sent to each agent into the run workspace under that agent's attempt
+  folder.
 - Validator adapters apply JSON Schema and contract validation.
 - Writer adapters emit final case-study Markdown, inspection reports, and
   RAG-ready knowledge cards.
@@ -120,6 +126,8 @@ Expected ports include:
 - `RunWorkspaceStore` for creating auditable inspection run workspaces.
 - `Logger` for user-visible and diagnostic messages.
 - `MemoryStore` for local operational swarm memory.
+- `PromptTemplateReader` for loading shared and agent-specific prompt templates.
+- `PromptArtifactWriter` for saving exact run-specific agent prompts.
 - `ArtifactValidator` for schema-backed runtime artifact checks used before
   writing memory or final outputs.
 - `FindingValidator`, `QaValidator`, `KnowledgeCardValidator`, and

@@ -472,3 +472,46 @@ git status
 ```bash
 feat(agents): define registry and execution contracts
 ```
+
+### Milestone 11: Prompt Template System
+
+#### Goal
+
+Create auditable prompt templates for agents.
+
+#### Tasks
+
+- Added shared prompt templates for senior engineer rules, evidence rules,
+  output contract rules, and revision rules under `prompts/shared/`.
+- Added required V1 agent templates for `scout`, `architecture`,
+  `pattern_miner`, `qa_verifier`, and `final_reviewer` under
+  `prompts/agents/`.
+- Added a prompt builder application service that injects objective, target
+  repository context, repository index summary, previous outputs, memory
+  snapshot, output schema, revision request context, and evidence rules.
+- Added prompt template and prompt artifact ports to preserve hexagonal
+  boundaries.
+- Added filesystem adapters that load templates and save the exact assembled
+  prompt under `agents/<agent-id>/attempt-<n>/prompt.md` in the run workspace.
+
+#### TDD
+
+Added prompt builder tests one behavior at a time for template loading,
+interpolation, missing template errors, prompt artifact writing, and revision
+prompt context.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(prompts): build auditable agent prompts from templates
+```
