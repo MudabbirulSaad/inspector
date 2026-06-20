@@ -201,7 +201,55 @@ export async function createDefaultScoutArchitectureFakeRunner(
     streamingEvents: [],
   };
 
-  return new FakeAgentRunner({ results: [scoutResult, architectureResult] });
+  const patternMinerResult: AgentRunResult = {
+    stdout: `${JSON.stringify({
+      patterns: [
+        {
+          name: "Evidence-first inspection outputs",
+          problemSolved:
+            "Keeps default inspection output tied to repository files that were actually read.",
+          implementationShape:
+            "Default agent outputs cite the selected repository file and keep confidence low when evidence is shallow.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          tradeoffs: [
+            "This avoids unsupported claims but produces limited pattern value until a real agent inspects the codebase.",
+          ],
+          whenToUse:
+            "Use for deterministic local runs and tests that need schema-valid placeholder output.",
+          whenNotToUse:
+            "Do not use as a substitute for real pattern mining in production inspection reports.",
+          adaptationValue:
+            "The same evidence discipline can guide future fake runners and fixtures.",
+          tags: ["evidence", "testing"],
+          confidence: 0.4,
+        },
+      ],
+      findings: [
+        {
+          id: "finding-pattern-miner-001",
+          agent: "pattern_miner",
+          severity: "info",
+          claim:
+            "The default Pattern Miner result has only shallow repository evidence.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          recommendation:
+            "Configure a real agent runner before relying on pattern findings.",
+          confidence: 0.4,
+          validation: ["schema-valid", "evidence-valid"],
+        },
+      ],
+    })}\n`,
+    stderr: "",
+    exitCode: 0,
+    startedAt: new Date(0).toISOString(),
+    completedAt: new Date(0).toISOString(),
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+
+  return new FakeAgentRunner({
+    results: [scoutResult, architectureResult, patternMinerResult],
+  });
 }
 
 async function chooseDefaultEvidenceFile(

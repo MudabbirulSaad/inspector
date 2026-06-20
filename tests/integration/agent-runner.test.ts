@@ -136,7 +136,7 @@ test("fake agent runner emits configured streaming events and returns them in th
   ]);
 });
 
-test("default Scout and Architecture fake runner cites a safe readable repository file", async () => {
+test("default Scout, Architecture, and Pattern Miner fake runner cites a safe readable repository file", async () => {
   class FixtureRepositoryReader implements RepositoryReader {
     async listEntries(): Promise<RepositoryEntry[]> {
       return [
@@ -174,10 +174,20 @@ test("default Scout and Architecture fake runner cites a safe readable repositor
     prompt: "Inspect architecture.",
     workspaceRoot: "/tmp/inspection-run",
   });
+  const patternMiner = await runner.runAgent({
+    agentId: "pattern_miner",
+    attempt: 1,
+    prompt: "Inspect patterns.",
+    workspaceRoot: "/tmp/inspection-run",
+  });
 
   assert.equal(JSON.parse(scout.stdout).projectType.evidence[0].file, "src/index.ts");
   assert.equal(
     JSON.parse(architecture.stdout).layerMap[0].evidence[0].file,
+    "src/index.ts",
+  );
+  assert.equal(
+    JSON.parse(patternMiner.stdout).patterns[0].evidence[0].file,
     "src/index.ts",
   );
 });

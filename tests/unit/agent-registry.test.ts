@@ -24,7 +24,11 @@ test("agent registry exposes the fixed V1 agent contracts", () => {
     [
       { id: "scout", outputSchema: "scout-output", required: true },
       { id: "architecture", outputSchema: "architecture-output", required: true },
-      { id: "pattern_miner", outputSchema: "finding", required: true },
+      {
+        id: "pattern_miner",
+        outputSchema: "pattern-miner-output",
+        required: true,
+      },
       { id: "qa_verifier", outputSchema: "qa-result", required: true },
       {
         id: "final_reviewer",
@@ -80,7 +84,7 @@ test("agent registry exposes the dependency graph for scheduled execution", () =
   assert.deepEqual(getAgentDependencyGraph({ lifecycle: "v1" }), {
     scout: [],
     architecture: ["scout"],
-    pattern_miner: ["scout"],
+    pattern_miner: ["architecture"],
     qa_verifier: ["architecture", "pattern_miner"],
     final_reviewer: ["qa_verifier"],
   });

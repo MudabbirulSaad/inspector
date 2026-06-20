@@ -31,6 +31,15 @@ Each architecture section separates observed facts from optional interpretation
 and cites repository-relative file and line evidence. Findings remain candidate
 findings until later QA accepts or rejects them.
 
+## Pattern Miner Output
+
+`pattern-miner-output.schema.json` describes reusable implementation patterns
+observed by the Pattern Miner agent. Each pattern records the name, problem
+solved, implementation shape, evidence, tradeoffs, when to use it, when not to
+use it, adaptation value, tags, and confidence. Tradeoffs are required, and
+high-confidence patterns require traceable evidence. Pattern Miner also emits
+candidate findings for downstream QA and reporting.
+
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required.
@@ -72,8 +81,8 @@ aligned with these schemas.
 The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
 validators for Scout output, Architecture output, findings, QA results,
-knowledge cards, memory events, and inspection reports without duplicating
-schema definitions in TypeScript.
+Pattern Miner output, knowledge cards, memory events, and inspection reports
+without duplicating schema definitions in TypeScript.
 
 ## Agent Output Validation
 

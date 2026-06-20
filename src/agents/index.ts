@@ -75,9 +75,9 @@ const agentContracts = [
     description:
       "Finds repeated implementation patterns, conventions, and inconsistencies that affect maintainability.",
     lifecycle: "v1",
-    dependencies: ["scout"],
+    dependencies: ["architecture"],
     outputArtifacts: ["agents/pattern_miner/attempt-{attempt}/output.json"],
-    outputSchema: "finding",
+    outputSchema: "pattern-miner-output",
     retryPolicy: defaultRetryPolicy,
     required: true,
     qaRevisionOwnership: { ownsRevisionFor: ["pattern_miner"] },

@@ -1,0 +1,71 @@
+{
+  "$id": "pattern-miner-output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pattern Miner output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["patterns", "findings"],
+  "properties": {
+    "patterns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    }
+  },
+  "$defs": {
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "problemSolved",
+        "implementationShape",
+        "evidence",
+        "tradeoffs",
+        "whenToUse",
+        "whenNotToUse",
+        "adaptationValue",
+        "tags",
+        "confidence"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "problemSolved": { "type": "string", "minLength": 1 },
+        "implementationShape": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "tradeoffs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "whenToUse": { "type": "string", "minLength": 1 },
+        "whenNotToUse": { "type": "string", "minLength": 1 },
+        "adaptationValue": { "type": "string", "minLength": 1 },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "confidence": { "type": "number", "minimum": 0.8 } },
+            "required": ["confidence"]
+          },
+          "then": {
+            "properties": { "evidence": { "type": "array", "minItems": 1 } }
+          }
+        }
+      ]
+    }
+  }
+}

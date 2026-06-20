@@ -924,3 +924,60 @@ git status
 ```bash
 feat(agents): add architecture cartographer
 ```
+
+### Milestone 21: Pattern Miner Agent Integration
+
+#### Goal
+
+Integrate the Pattern Miner agent after Architecture in the first runtime CLI
+flow.
+
+#### Tasks
+
+- Added `pattern-miner-output.schema.json`, a matching example, runtime
+  validator support, and TypeScript domain models.
+- Updated the Pattern Miner registry contract to depend on `architecture` and
+  validate `pattern-miner-output`.
+- Required Pattern Miner output to include pattern name, problem solved,
+  implementation shape, evidence, tradeoffs, when to use, when not to use,
+  adaptation value, tags, confidence, and candidate findings.
+- Required every pattern to include tradeoffs and required high-confidence
+  patterns to carry traceable evidence.
+- Updated Pattern Miner prompt rules to avoid pattern worship and keep
+  recommendations context-aware.
+- Introduced a reusable application workflow step for prompt construction,
+  runner execution, output persistence, and schema validation across Scout,
+  Architecture, and Pattern Miner.
+- Wired Pattern Miner execution after Scout and Architecture validation without
+  adding Pattern Miner orchestration to the CLI adapter.
+- Passed Scout output, Architecture output, blackboard memory, objective,
+  repository index context, and the Pattern Miner output schema into the audited
+  Pattern Miner prompt.
+- Wrote Pattern Miner output, schema validation, and evidence validation
+  artifacts under the run workspace.
+- Appended only schema-valid and evidence-valid Pattern Miner findings to
+  candidate memory.
+
+#### TDD
+
+Added contract tests for the Pattern Miner dependency and output schema,
+runtime validator coverage for valid pattern output and missing-tradeoff
+failure, then CLI integration coverage for Architecture dependency, Pattern
+Miner prompt context, output validation, evidence validation, and memory
+append.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): mine reusable architecture patterns
+```

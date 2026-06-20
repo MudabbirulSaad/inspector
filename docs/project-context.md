@@ -56,13 +56,14 @@ paths, positive line ranges, high-confidence finding evidence, QA finding
 references, and knowledge-card references to approved findings before semantic
 QA, while loading line counts only for cited repository files. The runtime CLI
 slice now parses `inspector run`, validates repository and objective paths,
-wires concrete adapters, prints progress, and calls a Scout/Architecture
-application use case. That use case creates a run workspace, indexes the
-repository, initializes memory, builds auditable Scout and Architecture prompts,
-runs Scout before Architecture through the runner port, validates structured
-schemas and cited evidence, writes artifacts through ports, and appends only
-candidate findings from schema-valid and evidence-valid outputs. Full
-scheduler-driven multi-agent orchestration is still pending.
+wires concrete adapters, prints progress, and calls a Scout/Architecture/Pattern
+Miner application use case. That use case creates a run workspace, indexes the
+repository, initializes memory, builds auditable Scout, Architecture, and
+Pattern Miner prompts, runs Scout before Architecture before Pattern Miner
+through the runner port, validates structured schemas and cited evidence, writes
+artifacts through ports, and appends only candidate findings from schema-valid
+and evidence-valid outputs. Full scheduler-driven multi-agent orchestration is
+still pending.
 
 ## Non-Goals
 

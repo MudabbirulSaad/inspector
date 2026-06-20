@@ -3,6 +3,7 @@ import type {
   ArchitectureOutput,
   Evidence,
   Finding,
+  PatternMinerOutput,
   RunConfig,
   ScoutOutput,
 } from "../domain/types.js";
@@ -101,46 +102,14 @@ export async function runScoutArchitectureInspection(
     memory: runMemory,
   });
 
-  const scoutPrompt = await buildAgentPrompt({
-    agentId: "scout",
-    attempt: 1,
+  const scoutSchemaResult = await runAgentWorkflowStep({
+    input,
     workspace,
-    templates: input.promptTemplates,
-    artifacts: input.promptArtifacts,
-    objective: input.objective,
-    targetRepoContext: input.config.target,
+    agentId: "scout",
+    progressName: "Scout",
     repoIndexSummary,
-    previousOutputs: [],
     memorySnapshot,
-    outputSchema: await input.schemaReader.readAgentOutputSchema("scout-output"),
-  });
-
-  input.progress?.("Running Scout");
-  const scoutRun = await executeAgentRun({
-    runner: input.runner,
-    agentId: "scout",
-    attempt: 1,
-    prompt: scoutPrompt.prompt,
-    workspaceRoot: workspace.root,
-    onStreamingEvent: (event) => {
-      input.stream?.("scout", event.kind, event.message);
-    },
-  });
-  await input.outputArtifacts.writeAgentOutput({
-    workspace,
-    agentId: "scout",
-    attempt: 1,
-    content: scoutRun.stdout,
-  });
-
-  input.progress?.("Validating Scout schema");
-  const scoutSchemaResult = await validateAgentOutput({
-    workspace,
-    agent: getAgentContract("scout"),
-    attempt: 1,
-    rawOutput: scoutRun.stdout,
-    validators: input.validators,
-    reports: input.validationReports,
+    previousOutputs: [],
   });
 
   if (!scoutSchemaResult.valid) {
@@ -178,48 +147,14 @@ export async function runScoutArchitectureInspection(
     });
   }
 
-  const architecturePrompt = await buildAgentPrompt({
-    agentId: "architecture",
-    attempt: 1,
+  const architectureSchemaResult = await runAgentWorkflowStep({
+    input,
     workspace,
-    templates: input.promptTemplates,
-    artifacts: input.promptArtifacts,
-    objective: input.objective,
-    targetRepoContext: input.config.target,
+    agentId: "architecture",
+    progressName: "Architecture",
     repoIndexSummary,
-    previousOutputs: { scout: scoutOutput },
     memorySnapshot,
-    outputSchema: await input.schemaReader.readAgentOutputSchema(
-      "architecture-output",
-    ),
-  });
-
-  input.progress?.("Running Architecture");
-  const architectureRun = await executeAgentRun({
-    runner: input.runner,
-    agentId: "architecture",
-    attempt: 1,
-    prompt: architecturePrompt.prompt,
-    workspaceRoot: workspace.root,
-    onStreamingEvent: (event) => {
-      input.stream?.("architecture", event.kind, event.message);
-    },
-  });
-  await input.outputArtifacts.writeAgentOutput({
-    workspace,
-    agentId: "architecture",
-    attempt: 1,
-    content: architectureRun.stdout,
-  });
-
-  input.progress?.("Validating Architecture schema");
-  const architectureSchemaResult = await validateAgentOutput({
-    workspace,
-    agent: getAgentContract("architecture"),
-    attempt: 1,
-    rawOutput: architectureRun.stdout,
-    validators: input.validators,
-    reports: input.validationReports,
+    previousOutputs: { scout: scoutOutput },
   });
 
   if (!architectureSchemaResult.valid) {
@@ -257,7 +192,107 @@ export async function runScoutArchitectureInspection(
     });
   }
 
+  const patternMinerSchemaResult = await runAgentWorkflowStep({
+    input,
+    workspace,
+    agentId: "pattern_miner",
+    progressName: "Pattern Miner",
+    repoIndexSummary,
+    memorySnapshot,
+    previousOutputs: { scout: scoutOutput, architecture: architectureOutput },
+  });
+
+  if (!patternMinerSchemaResult.valid) {
+    throw new InspectionRunFailedError(
+      `Pattern Miner schema validation failed: ${patternMinerSchemaResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+
+  const patternMinerOutput =
+    patternMinerSchemaResult.value as PatternMinerOutput;
+
+  input.progress?.("Validating Pattern Miner evidence");
+  const patternMinerEvidenceResult = await validateEvidenceForAgent({
+    agentId: "pattern_miner",
+    workspace,
+    repositoryReader: input.repositoryReader,
+    entries,
+    findings: patternMinerEvidenceFindings(patternMinerOutput),
+    evidenceReports: input.evidenceReports,
+  });
+
+  if (!patternMinerEvidenceResult.valid) {
+    throw new InspectionRunFailedError(
+      `Pattern Miner evidence validation failed: ${patternMinerEvidenceResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+
+  for (const finding of patternMinerOutput.findings) {
+    await appendSwarmFinding({
+      finding,
+      memory: runMemory,
+      validator: input.validators.finding,
+    });
+  }
+
   return { workspace };
+}
+
+async function runAgentWorkflowStep(input: {
+  input: RunScoutArchitectureInspectionInput;
+  workspace: RunWorkspace;
+  agentId: "scout" | "architecture" | "pattern_miner";
+  progressName: string;
+  repoIndexSummary: unknown;
+  memorySnapshot: string;
+  previousOutputs: unknown;
+}): ReturnType<typeof validateAgentOutput> {
+  const agent = getAgentContract(input.agentId);
+  const prompt = await buildAgentPrompt({
+    agentId: input.agentId,
+    attempt: 1,
+    workspace: input.workspace,
+    templates: input.input.promptTemplates,
+    artifacts: input.input.promptArtifacts,
+    objective: input.input.objective,
+    targetRepoContext: input.input.config.target,
+    repoIndexSummary: input.repoIndexSummary,
+    previousOutputs: input.previousOutputs,
+    memorySnapshot: input.memorySnapshot,
+    outputSchema: await input.input.schemaReader.readAgentOutputSchema(
+      agent.outputSchema,
+    ),
+  });
+
+  input.input.progress?.(`Running ${input.progressName}`);
+  const run = await executeAgentRun({
+    runner: input.input.runner,
+    agentId: input.agentId,
+    attempt: 1,
+    prompt: prompt.prompt,
+    workspaceRoot: input.workspace.root,
+    onStreamingEvent: (event) => {
+      input.input.stream?.(input.agentId, event.kind, event.message);
+    },
+  });
+  await input.input.outputArtifacts.writeAgentOutput({
+    workspace: input.workspace,
+    agentId: input.agentId,
+    attempt: 1,
+    content: run.stdout,
+  });
+
+  input.input.progress?.(`Validating ${input.progressName} schema`);
+  return validateAgentOutput({
+    workspace: input.workspace,
+    agent,
+    attempt: 1,
+    rawOutput: run.stdout,
+    validators: input.input.validators,
+    reports: input.input.validationReports,
+  });
 }
 
 async function validateEvidenceForAgent(input: {
@@ -368,6 +403,21 @@ function architectureEvidenceFindings(output: ArchitectureOutput): Finding[] {
     ...output.architectureRisks.map((item, index) =>
       architectureObservationFinding("risk", index, item),
     ),
+    ...output.findings,
+  ];
+}
+
+function patternMinerEvidenceFindings(output: PatternMinerOutput): Finding[] {
+  return [
+    ...output.patterns.map((pattern, index) => ({
+      id: `finding-pattern-miner-pattern-${index + 1}`,
+      agent: "pattern_miner",
+      severity: "info" as const,
+      claim: `${pattern.name}: ${pattern.problemSolved}`,
+      evidence: pattern.evidence,
+      recommendation: pattern.adaptationValue,
+      confidence: pattern.confidence,
+    })),
     ...output.findings,
   ];
 }

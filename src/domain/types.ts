@@ -122,6 +122,24 @@ export interface ArchitectureOutput {
   findings: Finding[];
 }
 
+export interface PatternMinerPattern {
+  name: string;
+  problemSolved: string;
+  implementationShape: string;
+  evidence: Evidence[];
+  tradeoffs: string[];
+  whenToUse: string;
+  whenNotToUse: string;
+  adaptationValue: string;
+  tags: string[];
+  confidence: number;
+}
+
+export interface PatternMinerOutput {
+  patterns: PatternMinerPattern[];
+  findings: Finding[];
+}
+
 export interface QaCheck {
   name: string;
   status: QaStatus;

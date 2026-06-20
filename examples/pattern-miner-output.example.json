@@ -1,0 +1,41 @@
+{
+  "patterns": [
+    {
+      "name": "Ports around infrastructure dependencies",
+      "problemSolved": "Keeps application workflow behavior independent from filesystem, process, and runner implementations.",
+      "implementationShape": "Application services receive port interfaces and adapters implement Node-specific behavior outside the hexagon.",
+      "evidence": [
+        {
+          "file": "src/application/run-scout-architecture-inspection.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ],
+      "tradeoffs": [
+        "Adds interface and adapter plumbing that can feel heavy for very small workflows."
+      ],
+      "whenToUse": "Use when orchestration needs deterministic tests or replaceable infrastructure.",
+      "whenNotToUse": "Avoid when a short one-off script has no meaningful infrastructure variation.",
+      "adaptationValue": "Future agents can reuse the port pattern to add new inspection steps without binding the core to Codex or Node APIs.",
+      "tags": ["architecture", "ports", "testability"],
+      "confidence": 0.8
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-pattern-miner-001",
+      "agent": "pattern_miner",
+      "severity": "info",
+      "claim": "The workflow uses ports to keep application orchestration independent from concrete adapters.",
+      "evidence": [
+        {
+          "file": "src/application/run-scout-architecture-inspection.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ],
+      "recommendation": "Continue introducing new agent steps through reusable application workflow helpers or ports rather than CLI adapter logic.",
+      "confidence": 0.8
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import type {
   InspectionReport,
   KnowledgeCard,
   MemoryEvent,
+  PatternMinerOutput,
   QaIssue,
   QaResult,
   ScoutOutput,
@@ -19,6 +20,7 @@ export const validationBoundary = "validation" as const;
 export type SchemaContractName =
   | "scout-output"
   | "architecture-output"
+  | "pattern-miner-output"
   | "finding"
   | "qa-result"
   | "knowledge-card"
@@ -45,6 +47,7 @@ export interface ContractValidator<T> {
 export interface SchemaContractValidators {
   "scout-output": ContractValidator<ScoutOutput>;
   "architecture-output": ContractValidator<ArchitectureOutput>;
+  "pattern-miner-output": ContractValidator<PatternMinerOutput>;
   finding: ContractValidator<Finding>;
   "qa-result": ContractValidator<QaResult>;
   "knowledge-card": ContractValidator<KnowledgeCard>;
@@ -57,6 +60,7 @@ const schemaContracts = [
   "evidence",
   "scout-output",
   "architecture-output",
+  "pattern-miner-output",
   "finding",
   "qa-result",
   "qa-issue",
@@ -73,6 +77,7 @@ const schemaContracts = [
 const contractTitles: Record<SchemaContractName, string> = {
   "scout-output": "Scout output",
   "architecture-output": "Architecture output",
+  "pattern-miner-output": "Pattern Miner output",
   finding: "Finding",
   "qa-result": "QA result",
   "knowledge-card": "Knowledge card",
@@ -103,6 +108,11 @@ export async function createSchemaContractValidators(
       ajv,
       schemas,
       "architecture-output",
+    ),
+    "pattern-miner-output": createValidator<PatternMinerOutput>(
+      ajv,
+      schemas,
+      "pattern-miner-output",
     ),
     finding: createValidator<Finding>(ajv, schemas, "finding"),
     "qa-result": createValidator<QaResult>(ajv, schemas, "qa-result"),

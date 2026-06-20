@@ -102,14 +102,17 @@ Adapter responsibilities include:
   use cases.
 - The CLI `run` adapter validates local repository and objective paths, wires
   concrete filesystem, memory, validation, prompt, schema, and runner adapters,
-  prints user-visible progress, and calls the Scout/Architecture application
-  use case.
-- The current Scout/Architecture application use case creates the run workspace,
-  indexes the repository, initializes memory, builds auditable prompts, runs
-  Scout before Architecture, validates structured schema and cited evidence,
-  writes runtime artifacts through ports, and appends only candidate findings
-  from schema-valid and evidence-valid outputs. It remains a linear early
-  runtime slice until the full scheduler-driven orchestration flow is wired.
+  prints user-visible progress, and calls the Scout/Architecture/Pattern Miner
+  application use case.
+- The current Scout/Architecture/Pattern Miner application use case creates the
+  run workspace, indexes the repository, initializes memory, builds auditable
+  prompts, runs Scout before Architecture before Pattern Miner, validates
+  structured schema and cited evidence, writes runtime artifacts through ports,
+  and appends only candidate findings from schema-valid and evidence-valid
+  outputs. Shared application step logic handles prompt construction, runner
+  execution, output persistence, and schema validation for these agents. It
+  remains a linear early runtime slice until the full scheduler-driven
+  orchestration flow is wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
@@ -210,6 +213,11 @@ Later optional agents are registered but not required for the V1 execution set:
 
 Scheduler code should consume the registry or derived dependency graph rather
 than hardcoding agent ids in orchestration logic.
+
+Pattern Miner depends on validated Architecture output. Its output contract is
+`pattern-miner-output`, which records reusable patterns with the problem solved,
+implementation shape, evidence, tradeoffs, when to use, when not to use,
+adaptation value, tags, confidence, and candidate findings.
 
 ## Scheduler DAG
 

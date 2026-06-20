@@ -133,6 +133,46 @@ const architectureOutput = {
   findings: [architectureFinding],
 };
 
+const patternMinerFinding = {
+  id: "finding-pattern-miner-001",
+  agent: "pattern_miner",
+  severity: "info",
+  claim: "The fixture repeats README-based evidence across prior inspection steps.",
+  evidence: [
+    {
+      file: "README.md",
+      lineStart: 1,
+      lineEnd: 2,
+    },
+  ],
+  recommendation:
+    "Treat repeated README-only observations as low-depth context until source evidence exists.",
+  confidence: 0.6,
+};
+
+const patternMinerOutput = {
+  patterns: [
+    {
+      name: "README-only inspection evidence",
+      problemSolved:
+        "Keeps early inspection claims tied to the only repository file in the fixture.",
+      implementationShape:
+        "Scout, Architecture, and Pattern Miner all cite README.md before deeper source evidence exists.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      tradeoffs: [
+        "This pattern prevents unsupported claims but provides shallow architecture signal.",
+      ],
+      whenToUse: "Use when repository evidence is sparse and context must remain traceable.",
+      whenNotToUse: "Avoid treating README-only evidence as proof of runtime architecture.",
+      adaptationValue:
+        "Future agents can preserve evidence discipline while requesting deeper source inspection.",
+      tags: ["evidence", "inspection"],
+      confidence: 0.7,
+    },
+  ],
+  findings: [patternMinerFinding],
+};
+
 function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunResult {
   return {
     stdout,
@@ -159,11 +199,26 @@ function successfulArchitectureResult(
   };
 }
 
+function successfulPatternMinerResult(
+  stdout = JSON.stringify(patternMinerOutput),
+): AgentRunResult {
+  return {
+    stdout,
+    stderr: "",
+    exitCode: 0,
+    startedAt: "2026-06-20T01:02:08.000Z",
+    completedAt: "2026-06-20T01:02:09.000Z",
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+}
+
 function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
   return new FakeAgentRunner({
     results: [
       successfulScoutResult(),
       successfulArchitectureResult(),
+      successfulPatternMinerResult(),
       ...results,
     ],
   });
@@ -326,7 +381,7 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
   });
 
   assert.equal(result.exitCode, 0);
-  assert.equal(runner.requests.length, 2);
+  assert.equal(runner.requests.length, 3);
   assert.equal(runner.requests[0]?.agentId, "scout");
   assert.match(runner.requests[0]?.prompt ?? "", /Inspect the repository/);
   assert.deepEqual(
@@ -403,6 +458,36 @@ test("CLI run sends Architecture a prompt containing Scout output and Architectu
   assert.match(prompt, /layerMap/);
 });
 
+test("CLI run sends Pattern Miner a prompt containing Scout and Architecture outputs", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(runner.requests[2]?.agentId, "pattern_miner");
+  const prompt = runner.requests[2]?.prompt ?? "";
+  assert.match(prompt, /# Agent Prompt: pattern_miner/);
+  assert.match(prompt, /Previous Outputs/);
+  assert.match(prompt, /architectureImpression/);
+  assert.match(prompt, /layerMap/);
+  assert.match(prompt, /Run initialized/);
+  assert.match(prompt, /tradeoffs/);
+  assert.match(prompt, /whenNotToUse/);
+});
+
 test("CLI run writes repository, memory, schema, and evidence artifacts", async () => {
   const fixture = await createFixture();
 
@@ -439,7 +524,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as unknown),
-    [scoutFinding, architectureFinding],
+    [scoutFinding, architectureFinding, patternMinerFinding],
   );
   assert.match(
     await readFile(
@@ -484,6 +569,41 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
     ),
     /"valid": true/,
   );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "pattern_miner", "attempt-1", "output.json"),
+        "utf8",
+      ),
+    ),
+    patternMinerOutput,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "pattern_miner",
+        "attempt-1",
+        "report.json",
+      ),
+      "utf8",
+    ),
+    /"contract": "pattern-miner-output"/,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "pattern_miner",
+        "attempt-1",
+        "evidence.json",
+      ),
+      "utf8",
+    ),
+    /"valid": true/,
+  );
 });
 
 test("CLI run prints verbose progress and Scout streaming output", async () => {
@@ -505,6 +625,7 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
       results: [
         successfulScoutResult(JSON.stringify(scoutOutput)),
         successfulArchitectureResult(JSON.stringify(architectureOutput)),
+        successfulPatternMinerResult(JSON.stringify(patternMinerOutput)),
       ].map((agentResult) => ({
         ...agentResult,
         streamingEvents: [
@@ -525,6 +646,8 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.match(stdout.join("\n"), /\[scout:status\] Scout started/);
   assert.match(stdout.join("\n"), /Running Architecture/);
   assert.match(stdout.join("\n"), /\[architecture:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Running Pattern Miner/);
+  assert.match(stdout.join("\n"), /\[pattern_miner:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
 });
 
@@ -652,4 +775,76 @@ test("CLI run fails when Architecture evidence cites missing repository lines", 
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Architecture evidence validation failed/);
+});
+
+test("CLI run fails when Pattern Miner output omits tradeoffs", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidPatternOutput = {
+    ...patternMinerOutput,
+    patterns: [{ ...patternMinerOutput.patterns[0], tradeoffs: [] }],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(JSON.stringify(invalidPatternOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Pattern Miner schema validation failed/);
+  assert.match(stderr.join("\n"), /tradeoffs/);
+});
+
+test("CLI run fails when Pattern Miner evidence cites missing repository lines", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidPatternOutput = {
+    ...patternMinerOutput,
+    patterns: [
+      {
+        ...patternMinerOutput.patterns[0],
+        evidence: [{ file: "README.md", lineStart: 99, lineEnd: 100 }],
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(JSON.stringify(invalidPatternOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Pattern Miner evidence validation failed/);
 });
