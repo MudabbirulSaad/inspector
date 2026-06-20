@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts",
-    "test:watch": "node --import tsx --test --watch tests/*.test.mjs tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts tests/unit/*.test.ts tests/integration/*.test.ts",
+    "test:watch": "node --import tsx --test --watch tests/*.test.mjs tests/*.test.ts tests/unit/*.test.ts tests/integration/*.test.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "build": "tsc",

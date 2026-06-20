@@ -138,3 +138,41 @@ git status
 ```bash
 chore(tooling): add TypeScript CLI toolchain
 ```
+
+### Milestone 03: Hexagonal Source Skeleton
+
+#### Goal
+
+Create source boundaries for the planned architecture without overbuilding.
+
+#### Tasks
+
+- Create or refine source directories for domain, application, ports, adapters,
+  agents, validation, memory, writers, and shared code.
+- Create or refine test directories for unit tests, integration tests, and
+  fixtures.
+- Keep domain modules independent from Node APIs.
+- Keep application modules dependent on ports rather than adapters.
+- Allow adapters to use Node APIs in future milestones.
+- Create only minimal files needed to compile and support future milestones.
+
+#### TDD
+
+Added an integration smoke test for public source-boundary imports and minimal
+CLI adapter module loading before creating the missing boundary modules.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+refactor(architecture): establish hexagonal source boundaries
+```
