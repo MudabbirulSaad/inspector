@@ -8,6 +8,7 @@ type JsonObject = Record<string, unknown>;
 
 const runtimeContracts = [
   "scout-output",
+  "architecture-output",
   "finding",
   "qa-result",
   "knowledge-card",
@@ -58,6 +59,10 @@ test("runtime validators reject invalid artifacts for every agent output contrac
     "scout-output": {
       ...(await readExample("scout-output")),
       projectType: { value: "Node.js", evidence: [] },
+    },
+    "architecture-output": {
+      ...(await readExample("architecture-output")),
+      layerMap: [],
     },
     finding: { ...(await readExample("finding")), confidence: 1.5 },
     "qa-result": { ...(await readExample("qa-result")), status: "unknown" },

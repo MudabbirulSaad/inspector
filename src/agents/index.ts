@@ -64,7 +64,7 @@ const agentContracts = [
     lifecycle: "v1",
     dependencies: ["scout"],
     outputArtifacts: ["agents/architecture/findings.json"],
-    outputSchema: "finding",
+    outputSchema: "architecture-output",
     retryPolicy: defaultRetryPolicy,
     required: true,
     qaRevisionOwnership: { ownsRevisionFor: ["architecture"] },

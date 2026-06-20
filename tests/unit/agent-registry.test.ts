@@ -23,7 +23,7 @@ test("agent registry exposes the fixed V1 agent contracts", () => {
     })),
     [
       { id: "scout", outputSchema: "scout-output", required: true },
-      { id: "architecture", outputSchema: "finding", required: true },
+      { id: "architecture", outputSchema: "architecture-output", required: true },
       { id: "pattern_miner", outputSchema: "finding", required: true },
       { id: "qa_verifier", outputSchema: "qa-result", required: true },
       {

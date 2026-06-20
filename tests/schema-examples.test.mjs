@@ -7,6 +7,7 @@ import addFormats from "ajv-formats";
 const contracts = [
   "evidence",
   "scout-output",
+  "architecture-output",
   "finding",
   "qa-result",
   "qa-issue",

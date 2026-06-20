@@ -1,0 +1,101 @@
+{
+  "$id": "architecture-output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Architecture output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "layerMap",
+    "dependencyDirection",
+    "moduleBoundaries",
+    "businessLogicLocations",
+    "frameworkGlueLocations",
+    "architectureRisks",
+    "findings"
+  ],
+  "properties": {
+    "layerMap": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "dependencyDirection": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/dependencyDirection" }
+    },
+    "moduleBoundaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "businessLogicLocations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "frameworkGlueLocations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "architectureRisks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    }
+  },
+  "$defs": {
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "observedFacts", "evidence"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "observedFacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "interpretation": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        }
+      }
+    },
+    "dependencyDirection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "source",
+        "target",
+        "direction",
+        "observedFacts",
+        "evidence"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "direction": { "type": "string", "minLength": 1 },
+        "observedFacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "interpretation": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        }
+      }
+    }
+  }
+}

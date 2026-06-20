@@ -61,6 +61,77 @@ const scoutOutput = {
   findings: [scoutFinding],
 };
 
+const architectureFinding = {
+  id: "finding-architecture-001",
+  agent: "architecture",
+  severity: "medium",
+  claim: "The fixture keeps its only observed interface in README documentation.",
+  evidence: [
+    {
+      file: "README.md",
+      lineStart: 1,
+      lineEnd: 2,
+    },
+  ],
+  recommendation: "Inspect source files before assigning runtime architecture labels.",
+  confidence: 0.6,
+};
+
+const architectureOutput = {
+  layerMap: [
+    {
+      name: "Documentation layer",
+      observedFacts: ["README.md provides the only visible repository context."],
+      interpretation: "The fixture does not prove runtime layers.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  dependencyDirection: [
+    {
+      name: "Documentation consumed by inspector",
+      source: "README.md",
+      target: "inspector run",
+      direction: "documentation is read by the inspection workflow",
+      observedFacts: ["README.md is cited by Scout and Architecture."],
+      interpretation: "No code dependency direction is proven by this fixture.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  moduleBoundaries: [
+    {
+      name: "README boundary",
+      observedFacts: ["README.md is the only cited repository file."],
+      interpretation: "Module boundaries remain unknown without source files.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  businessLogicLocations: [
+    {
+      name: "Business logic not observed",
+      observedFacts: ["README.md contains context rather than executable rules."],
+      interpretation: "No business logic location can be proven from this fixture.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  frameworkGlueLocations: [
+    {
+      name: "Framework glue not observed",
+      observedFacts: ["README.md does not show framework bootstrapping."],
+      interpretation: "No framework glue location can be proven from this fixture.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  architectureRisks: [
+    {
+      name: "Architecture evidence is shallow",
+      observedFacts: ["Only README.md is cited by the fixture output."],
+      interpretation: "Architecture findings should remain candidate findings.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  findings: [architectureFinding],
+};
+
 function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunResult {
   return {
     stdout,
@@ -71,6 +142,30 @@ function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunRe
     outputArtifactPaths: [],
     streamingEvents: [],
   };
+}
+
+function successfulArchitectureResult(
+  stdout = JSON.stringify(architectureOutput),
+): AgentRunResult {
+  return {
+    stdout,
+    stderr: "",
+    exitCode: 0,
+    startedAt: "2026-06-20T01:02:06.000Z",
+    completedAt: "2026-06-20T01:02:07.000Z",
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+}
+
+function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
+  return new FakeAgentRunner({
+    results: [
+      successfulScoutResult(),
+      successfulArchitectureResult(),
+      ...results,
+    ],
+  });
 }
 
 async function createFixture(): Promise<{
@@ -106,7 +201,7 @@ test("CLI run creates a run workspace for a valid command", async () => {
       fixture.outPath,
     ],
     clock: fixedClock,
-    runner: new FakeAgentRunner({ results: [successfulScoutResult()] }),
+    runner: successfulRunner(),
     stdout: (line) => stdout.push(line),
     stderr: (line) => stderr.push(line),
   });
@@ -134,7 +229,7 @@ test("CLI run reports a missing repository path", async () => {
   const result = await runInspectorCli({
     argv: ["run", "--objective", fixture.objectivePath, "--out", fixture.outPath],
     clock: fixedClock,
-    runner: new FakeAgentRunner({ results: [successfulScoutResult()] }),
+    runner: successfulRunner(),
     stderr: (line) => stderr.push(line),
   });
 
@@ -156,7 +251,7 @@ test("CLI run reports a missing objective file", async () => {
       fixture.outPath,
     ],
     clock: fixedClock,
-    runner: new FakeAgentRunner({ results: [successfulScoutResult()] }),
+    runner: successfulRunner(),
     stderr: (line) => stderr.push(line),
   });
 
@@ -166,7 +261,7 @@ test("CLI run reports a missing objective file", async () => {
 
 test("CLI run sends the objective to the fake Scout runner and saves Scout output", async () => {
   const fixture = await createFixture();
-  const runner = new FakeAgentRunner({ results: [successfulScoutResult()] });
+  const runner = successfulRunner();
 
   const result = await runInspectorCli({
     argv: [
@@ -183,7 +278,7 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
   });
 
   assert.equal(result.exitCode, 0);
-  assert.equal(runner.requests.length, 1);
+  assert.equal(runner.requests.length, 2);
   assert.equal(runner.requests[0]?.agentId, "scout");
   assert.match(runner.requests[0]?.prompt ?? "", /Inspect the repository/);
   assert.deepEqual(
@@ -206,7 +301,7 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
 
 test("CLI run sends Scout a prompt containing repository index context and Scout rules", async () => {
   const fixture = await createFixture();
-  const runner = new FakeAgentRunner({ results: [successfulScoutResult()] });
+  const runner = successfulRunner();
 
   const result = await runInspectorCli({
     argv: [
@@ -232,6 +327,34 @@ test("CLI run sends Scout a prompt containing repository index context and Scout
   assert.match(prompt, /projectType/);
 });
 
+test("CLI run sends Architecture a prompt containing Scout output and Architecture rules", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(runner.requests[1]?.agentId, "architecture");
+  const prompt = runner.requests[1]?.prompt ?? "";
+  assert.match(prompt, /# Agent Prompt: architecture/);
+  assert.match(prompt, /Previous Outputs/);
+  assert.match(prompt, /architectureImpression/);
+  assert.match(prompt, /Architecture Agent Output Rules/);
+  assert.match(prompt, /layerMap/);
+});
+
 test("CLI run writes repository, memory, schema, and evidence artifacts", async () => {
   const fixture = await createFixture();
 
@@ -245,7 +368,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       fixture.outPath,
     ],
     clock: fixedClock,
-    runner: new FakeAgentRunner({ results: [successfulScoutResult()] }),
+    runner: successfulRunner(),
     stdout: () => undefined,
   });
 
@@ -268,7 +391,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as unknown),
-    [scoutFinding],
+    [scoutFinding, architectureFinding],
   );
   assert.match(
     await readFile(
@@ -280,6 +403,35 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   assert.match(
     await readFile(
       join(workspaceRoot, "validation", "scout", "attempt-1", "evidence.json"),
+      "utf8",
+    ),
+    /"valid": true/,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "architecture", "attempt-1", "output.json"),
+        "utf8",
+      ),
+    ),
+    architectureOutput,
+  );
+  assert.match(
+    await readFile(
+      join(workspaceRoot, "validation", "architecture", "attempt-1", "report.json"),
+      "utf8",
+    ),
+    /"contract": "architecture-output"/,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "architecture",
+        "attempt-1",
+        "evidence.json",
+      ),
       "utf8",
     ),
     /"valid": true/,
@@ -304,6 +456,7 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
     runner: new FakeAgentRunner({
       results: [
         successfulScoutResult(JSON.stringify(scoutOutput)),
+        successfulArchitectureResult(JSON.stringify(architectureOutput)),
       ].map((agentResult) => ({
         ...agentResult,
         streamingEvents: [
@@ -322,6 +475,8 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.match(stdout.join("\n"), /Creating run workspace/);
   assert.match(stdout.join("\n"), /Indexing repository/);
   assert.match(stdout.join("\n"), /\[scout:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Running Architecture/);
+  assert.match(stdout.join("\n"), /\[architecture:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
 });
 
@@ -340,7 +495,9 @@ test("CLI run fails when Scout output is not schema-valid", async () => {
     ],
     clock: fixedClock,
     runner: new FakeAgentRunner({
-      results: [successfulScoutResult(JSON.stringify({ findings: [scoutFinding] }))],
+      results: [
+        successfulScoutResult(JSON.stringify({ findings: [scoutFinding] })),
+      ],
     }),
     stderr: (line) => stderr.push(line),
     stdout: () => undefined,
@@ -382,4 +539,69 @@ test("CLI run fails when Scout evidence cites missing repository lines", async (
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Scout evidence validation failed/);
+});
+
+test("CLI run fails when Architecture output is not schema-valid", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(JSON.stringify({ findings: [architectureFinding] })),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Architecture schema validation failed/);
+});
+
+test("CLI run fails when Architecture evidence cites missing repository lines", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidEvidenceOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        evidence: [{ file: "README.md", lineStart: 99, lineEnd: 100 }],
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(JSON.stringify(invalidEvidenceOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Architecture evidence validation failed/);
 });

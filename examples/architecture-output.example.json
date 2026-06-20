@@ -1,0 +1,119 @@
+{
+  "layerMap": [
+    {
+      "name": "Documentation layer",
+      "observedFacts": [
+        "README.md is present and provides the visible repository context."
+      ],
+      "interpretation": "The example repository can only support a documentation-level architecture map.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ]
+    }
+  ],
+  "dependencyDirection": [
+    {
+      "name": "Documentation-to-reader dependency",
+      "source": "README.md",
+      "target": "repository reader",
+      "direction": "external reader consumes repository documentation",
+      "observedFacts": [
+        "README.md contains the repository heading used as inspection context."
+      ],
+      "interpretation": "No source-level dependency direction can be proven from this example alone.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ]
+    }
+  ],
+  "moduleBoundaries": [
+    {
+      "name": "README boundary",
+      "observedFacts": [
+        "The example repository exposes README.md as the only cited module-like artifact."
+      ],
+      "interpretation": "Runtime module boundaries are unknown in this minimal example.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ]
+    }
+  ],
+  "businessLogicLocations": [
+    {
+      "name": "Business logic not observed",
+      "observedFacts": [
+        "The cited file contains repository context rather than executable business rules."
+      ],
+      "interpretation": "Business logic cannot be located from the available example evidence.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ]
+    }
+  ],
+  "frameworkGlueLocations": [
+    {
+      "name": "Framework glue not observed",
+      "observedFacts": [
+        "The cited file does not show framework bootstrapping or adapter code."
+      ],
+      "interpretation": "Framework glue cannot be located from the available example evidence.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ]
+    }
+  ],
+  "architectureRisks": [
+    {
+      "name": "Architecture evidence is shallow",
+      "observedFacts": [
+        "Only README.md is cited in the example architecture output."
+      ],
+      "interpretation": "The architecture agent should treat the result as low-confidence until source files are inspected.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-architecture-001",
+      "agent": "architecture",
+      "severity": "info",
+      "claim": "The example architecture output is limited to documentation-backed observations.",
+      "evidence": [
+        {
+          "file": "README.md",
+          "lineStart": 1,
+          "lineEnd": 2
+        }
+      ],
+      "recommendation": "Inspect source files before making deeper architecture claims.",
+      "confidence": 0.4,
+      "validation": ["schema-valid", "evidence-valid"]
+    }
+  ]
+}

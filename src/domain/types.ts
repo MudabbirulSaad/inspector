@@ -99,6 +99,29 @@ export interface ScoutOutput {
   findings: Finding[];
 }
 
+export interface ArchitectureObservation {
+  name: string;
+  observedFacts: string[];
+  interpretation?: string;
+  evidence: Evidence[];
+}
+
+export interface ArchitectureDependencyDirection extends ArchitectureObservation {
+  source: string;
+  target: string;
+  direction: string;
+}
+
+export interface ArchitectureOutput {
+  layerMap: ArchitectureObservation[];
+  dependencyDirection: ArchitectureDependencyDirection[];
+  moduleBoundaries: ArchitectureObservation[];
+  businessLogicLocations: ArchitectureObservation[];
+  frameworkGlueLocations: ArchitectureObservation[];
+  architectureRisks: ArchitectureObservation[];
+  findings: Finding[];
+}
+
 export interface QaCheck {
   name: string;
   status: QaStatus;

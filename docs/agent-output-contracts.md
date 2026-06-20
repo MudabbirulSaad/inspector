@@ -22,6 +22,15 @@ architecture impression, open questions, and structured findings. Concrete
 Scout claims must cite repository-relative evidence; open questions are the
 place for uncertainty rather than unsupported deep conclusions.
 
+## Architecture Output
+
+`architecture-output.schema.json` describes the Architecture agent's map. It
+requires layer map, dependency direction, module boundaries, business logic
+locations, framework glue locations, architecture risks, and candidate findings.
+Each architecture section separates observed facts from optional interpretation
+and cites repository-relative file and line evidence. Findings remain candidate
+findings until later QA accepts or rejects them.
+
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required.
@@ -62,9 +71,9 @@ aligned with these schemas.
 
 The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
-validators for Scout output, findings, QA results, knowledge cards, memory
-events, and inspection reports without duplicating schema definitions in
-TypeScript.
+validators for Scout output, Architecture output, findings, QA results,
+knowledge cards, memory events, and inspection reports without duplicating
+schema definitions in TypeScript.
 
 ## Agent Output Validation
 

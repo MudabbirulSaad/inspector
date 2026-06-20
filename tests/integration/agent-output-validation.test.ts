@@ -61,13 +61,13 @@ test("agent output validator selects the agent schema, parses valid JSON, and wr
     workspace,
     agent: getAgentContract("architecture"),
     attempt: 1,
-    rawOutput: await readExample("finding"),
+    rawOutput: await readExample("architecture-output"),
     validators: await createSchemaContractValidators(),
     reports,
   });
 
   assert.equal(result.valid, true);
-  assert.equal(result.contract, "finding");
+  assert.equal(result.contract, "architecture-output");
   assert.equal(
     result.reportPath,
     "/tmp/run/validation/architecture/attempt-1/report.json",
@@ -98,14 +98,14 @@ test("agent output validator reports malformed JSON without throwing", async () 
 
 test("agent output validator reports missing required fields as schema violations", async () => {
   const reports = new InMemoryValidationReports();
-  const finding = await readExampleObject("finding");
-  delete finding.claim;
+  const output = await readExampleObject("architecture-output");
+  delete output.dependencyDirection;
 
   const result = await validateAgentOutput({
     workspace,
     agent: getAgentContract("architecture"),
     attempt: 1,
-    rawOutput: JSON.stringify(finding),
+    rawOutput: JSON.stringify(output),
     validators: await createSchemaContractValidators(),
     reports,
   });
@@ -113,11 +113,11 @@ test("agent output validator reports missing required fields as schema violation
   assert.equal(result.valid, false);
   assert.equal(result.status, "schema-invalid");
   assert.equal(result.errors[0]?.type, "schema-violation");
-  assert.equal(result.errors[0]?.contract, "finding");
-  assert.match(result.errors[0]?.message ?? "", /Finding/);
-  assert.match(result.errors[0]?.message ?? "", /claim/);
+  assert.equal(result.errors[0]?.contract, "architecture-output");
+  assert.match(result.errors[0]?.message ?? "", /Architecture output/);
+  assert.match(result.errors[0]?.message ?? "", /dependencyDirection/);
   assert.match(reports.writes[0]?.content ?? "", /"status": "schema-invalid"/);
-  assert.match(reports.writes[0]?.content ?? "", /claim/);
+  assert.match(reports.writes[0]?.content ?? "", /dependencyDirection/);
 });
 
 test("agent output validator uses the selected agent contract rather than the output shape", async () => {

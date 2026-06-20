@@ -12,7 +12,13 @@ import {
   validateAgentOutput,
   validateEvidenceReferences,
 } from "../../application/index.js";
-import type { Evidence, Finding, RunConfig, ScoutOutput } from "../../domain/types.js";
+import type {
+  ArchitectureOutput,
+  Evidence,
+  Finding,
+  RunConfig,
+  ScoutOutput,
+} from "../../domain/types.js";
 import type {
   AgentRunResult,
   AgentRunner,
@@ -132,7 +138,7 @@ export async function runInspectorCli(
     });
 
     printProgress(stdout, command.verbose, "Running Scout");
-    const runner = request.runner ?? createDefaultScoutRunner(repositoryFiles);
+    const runner = request.runner ?? createDefaultRunner(repositoryFiles);
     const scoutRun = await executeAgentRun({
       runner,
       agentId: "scout",
@@ -179,6 +185,87 @@ export async function runInspectorCli(
 
     const memory = new NodeSwarmMemoryStore(workspace);
     for (const finding of scoutOutput.findings) {
+      await appendSwarmFinding({
+        finding,
+        memory,
+        validator: validators.finding,
+      });
+    }
+
+    const architecturePrompt = await buildAgentPrompt({
+      agentId: "architecture",
+      attempt: 1,
+      workspace,
+      templates: new NodePromptTemplateReader("prompts"),
+      artifacts: new NodePromptArtifactWriter(),
+      objective,
+      targetRepoContext: config.target,
+      repoIndexSummary: await readRepositoryIndexPromptContext(workspace),
+      previousOutputs: { scout: scoutOutput },
+      memorySnapshot: await readFile(
+        join(workspace.folders.memory, "blackboard.md"),
+        "utf8",
+      ),
+      outputSchema: JSON.parse(
+        await readFile("schemas/architecture-output.schema.json", "utf8"),
+      ) as unknown,
+    });
+
+    printProgress(stdout, command.verbose, "Running Architecture");
+    const architectureRun = await executeAgentRun({
+      runner,
+      agentId: "architecture",
+      attempt: 1,
+      prompt: architecturePrompt.prompt,
+      workspaceRoot: workspace.root,
+      onStreamingEvent: (event) => {
+        if (command.verbose) {
+          stdout(`[architecture:${event.kind}] ${event.message}`);
+        }
+      },
+    });
+    await writeAgentOutput(workspace, "architecture", architectureRun.stdout);
+
+    printProgress(stdout, command.verbose, "Validating Architecture schema");
+    const architectureSchemaResult = await validateAgentOutput({
+      workspace,
+      agent: getAgentContract("architecture"),
+      attempt: 1,
+      rawOutput: architectureRun.stdout,
+      validators,
+      reports: new NodeValidationReportWriter(),
+    });
+
+    if (!architectureSchemaResult.valid) {
+      stderr(
+        `Architecture schema validation failed: ${architectureSchemaResult.errors[0]?.message}`,
+      );
+      return { exitCode: 1, workspace };
+    }
+
+    const architectureOutput =
+      architectureSchemaResult.value as ArchitectureOutput;
+
+    printProgress(stdout, command.verbose, "Validating Architecture evidence");
+    const architectureEvidenceResult = await validateEvidenceReferences({
+      repositoryFiles,
+      findings: architectureEvidenceFindings(architectureOutput),
+    });
+
+    await writeEvidenceValidationReport(
+      workspace,
+      "architecture",
+      architectureEvidenceResult,
+    );
+
+    if (!architectureEvidenceResult.valid) {
+      stderr(
+        `Architecture evidence validation failed: ${architectureEvidenceResult.errors[0]?.message}`,
+      );
+      return { exitCode: 1, workspace };
+    }
+
+    for (const finding of architectureOutput.findings) {
       await appendSwarmFinding({
         finding,
         memory,
@@ -266,7 +353,7 @@ function printProgress(
   }
 }
 
-function createDefaultScoutRunner(
+function createDefaultRunner(
   repositoryFiles: { path: string; lineCount: number }[],
 ): AgentRunner {
   const citedFile =
@@ -274,7 +361,7 @@ function createDefaultScoutRunner(
     repositoryFiles[0] ??
     { path: "README.md", lineCount: 1 };
   const lineEnd = Math.max(1, Math.min(citedFile.lineCount, 1));
-  const result: AgentRunResult = {
+  const scoutResult: AgentRunResult = {
     stdout: `${JSON.stringify({
       projectType: {
         value: "repository requiring inspection",
@@ -327,7 +414,105 @@ function createDefaultScoutRunner(
     streamingEvents: [],
   };
 
-  return new FakeAgentRunner({ results: [result] });
+  const architectureResult: AgentRunResult = {
+    stdout: `${JSON.stringify({
+      layerMap: [
+        {
+          name: "Initial repository context",
+          observedFacts: [
+            `${citedFile.path} is available for architecture inspection.`,
+          ],
+          interpretation:
+            "The default runner can only provide a shallow architecture map.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      dependencyDirection: [
+        {
+          name: "Inspection input direction",
+          source: citedFile.path,
+          target: "architecture agent",
+          direction: "repository evidence is consumed by the architecture agent",
+          observedFacts: [
+            `${citedFile.path} is cited as the available repository evidence.`,
+          ],
+          interpretation:
+            "No source-code dependency direction is proven by the default runner.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      moduleBoundaries: [
+        {
+          name: "Initial file boundary",
+          observedFacts: [`${citedFile.path} exists in the repository index.`],
+          interpretation:
+            "Runtime module boundaries require a real architecture agent result.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      businessLogicLocations: [
+        {
+          name: "Business logic not located",
+          observedFacts: [
+            "The default runner has not inspected source-level business rules.",
+          ],
+          interpretation:
+            "Business logic location is unknown until a real agent inspects the repository.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      frameworkGlueLocations: [
+        {
+          name: "Framework glue not located",
+          observedFacts: [
+            "The default runner has not inspected framework bootstrapping code.",
+          ],
+          interpretation:
+            "Framework glue location is unknown until a real agent inspects the repository.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      architectureRisks: [
+        {
+          name: "Architecture evidence is shallow",
+          observedFacts: [
+            "The default Architecture result is derived from a single cited file.",
+          ],
+          interpretation:
+            "Candidate findings from the default runner should remain low confidence.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      findings: [
+        {
+          id: "finding-architecture-001",
+          agent: "architecture",
+          severity: "info",
+          claim:
+            "The default Architecture result has only shallow repository evidence.",
+          evidence: [
+            {
+              file: citedFile.path,
+              lineStart: 1,
+              lineEnd,
+            },
+          ],
+          recommendation:
+            "Configure a real agent runner before relying on architecture findings.",
+          confidence: 0.4,
+          validation: ["schema-valid", "evidence-valid"],
+        },
+      ],
+    })}\n`,
+    stderr: "",
+    exitCode: 0,
+    startedAt: new Date(0).toISOString(),
+    completedAt: new Date(0).toISOString(),
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+
+  return new FakeAgentRunner({ results: [scoutResult, architectureResult] });
 }
 
 async function readRepositoryIndexPromptContext(
@@ -415,21 +600,85 @@ async function writeScoutOutput(
   workspace: RunWorkspace,
   content: string,
 ): Promise<void> {
-  const directory = join(workspace.folders.agents, "scout", "attempt-1");
+  await writeAgentOutput(workspace, "scout", content);
+}
+
+async function writeAgentOutput(
+  workspace: RunWorkspace,
+  agentId: string,
+  content: string,
+): Promise<void> {
+  const directory = join(workspace.folders.agents, agentId, "attempt-1");
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, "output.json"), content);
 }
 
 async function writeEvidenceValidationReport(
   workspace: RunWorkspace,
-  result: unknown,
+  agentIdOrResult: string | unknown,
+  maybeResult?: unknown,
 ): Promise<void> {
-  const directory = join(workspace.folders.validation, "scout", "attempt-1");
+  const agentId = typeof agentIdOrResult === "string" ? agentIdOrResult : "scout";
+  const result = typeof agentIdOrResult === "string" ? maybeResult : agentIdOrResult;
+  const directory = join(workspace.folders.validation, agentId, "attempt-1");
   await mkdir(directory, { recursive: true });
   await writeFile(
     join(directory, "evidence.json"),
     `${JSON.stringify(result, null, 2)}\n`,
   );
+}
+
+function architectureEvidenceFindings(output: ArchitectureOutput): Finding[] {
+  return [
+    ...output.layerMap.map((item, index) =>
+      architectureObservationFinding("layer-map", index, item),
+    ),
+    ...output.dependencyDirection.map((item, index) =>
+      architectureObservationFinding(
+        "dependency-direction",
+        index,
+        item,
+        `${item.source} -> ${item.target}: ${item.direction}`,
+      ),
+    ),
+    ...output.moduleBoundaries.map((item, index) =>
+      architectureObservationFinding("module-boundary", index, item),
+    ),
+    ...output.businessLogicLocations.map((item, index) =>
+      architectureObservationFinding("business-logic", index, item),
+    ),
+    ...output.frameworkGlueLocations.map((item, index) =>
+      architectureObservationFinding("framework-glue", index, item),
+    ),
+    ...output.architectureRisks.map((item, index) =>
+      architectureObservationFinding("risk", index, item),
+    ),
+    ...output.findings,
+  ];
+}
+
+function architectureObservationFinding(
+  kind: string,
+  index: number,
+  observation: {
+    name: string;
+    observedFacts: string[];
+    interpretation?: string;
+    evidence: Evidence[];
+  },
+  detail = observation.name,
+): Finding {
+  return {
+    id: `finding-architecture-${kind}-${index + 1}`,
+    agent: "architecture",
+    severity: "info",
+    claim: `${detail}: ${observation.observedFacts.join(" ")}`,
+    evidence: observation.evidence,
+    recommendation:
+      observation.interpretation ??
+      "Treat this architecture observation as evidence-backed context.",
+    confidence: 0.5,
+  };
 }
 
 async function repositoryFilesWithLineCounts(

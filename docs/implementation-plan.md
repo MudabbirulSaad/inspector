@@ -875,3 +875,52 @@ git status
 ```bash
 feat(agents): integrate evidence-backed scout agent
 ```
+
+### Milestone 20: Architecture Agent Integration
+
+#### Goal
+
+Integrate the Architecture agent after Scout in the first runtime CLI flow.
+
+#### Tasks
+
+- Added `architecture-output.schema.json`, a matching example, runtime
+  validator support, and TypeScript domain models.
+- Updated the Architecture registry contract to validate `architecture-output`
+  rather than a single finding.
+- Required Architecture output to include layer map, dependency direction,
+  module boundaries, business logic locations, framework glue locations,
+  architecture risks, and structured candidate findings.
+- Updated the Architecture prompt rules to separate observed facts from
+  interpretation, cite real files and line ranges, avoid unproven vague labels,
+  and append findings only as candidate findings.
+- Wired CLI Architecture execution after Scout schema and evidence validation.
+- Passed repository index context, validated Scout output, blackboard memory,
+  objective, and the Architecture output schema into the audited Architecture
+  prompt.
+- Wrote Architecture output, schema validation, and evidence validation
+  artifacts under the run workspace.
+- Appended only schema-valid and evidence-valid Architecture findings to
+  candidate memory.
+
+#### TDD
+
+Added contract tests for the Architecture output schema/example and runtime
+validator, then CLI integration coverage for the Scout dependency, Architecture
+prompt context, output validation, evidence validation, and memory append.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): add architecture cartographer
+```

@@ -5,6 +5,7 @@ import addFormats from "ajv-formats/dist/index.js";
 
 import type {
   Finding,
+  ArchitectureOutput,
   InspectionReport,
   KnowledgeCard,
   MemoryEvent,
@@ -17,6 +18,7 @@ export const validationBoundary = "validation" as const;
 
 export type SchemaContractName =
   | "scout-output"
+  | "architecture-output"
   | "finding"
   | "qa-result"
   | "knowledge-card"
@@ -42,6 +44,7 @@ export interface ContractValidator<T> {
 
 export interface SchemaContractValidators {
   "scout-output": ContractValidator<ScoutOutput>;
+  "architecture-output": ContractValidator<ArchitectureOutput>;
   finding: ContractValidator<Finding>;
   "qa-result": ContractValidator<QaResult>;
   "knowledge-card": ContractValidator<KnowledgeCard>;
@@ -53,6 +56,7 @@ export interface SchemaContractValidators {
 const schemaContracts = [
   "evidence",
   "scout-output",
+  "architecture-output",
   "finding",
   "qa-result",
   "qa-issue",
@@ -68,6 +72,7 @@ const schemaContracts = [
 
 const contractTitles: Record<SchemaContractName, string> = {
   "scout-output": "Scout output",
+  "architecture-output": "Architecture output",
   finding: "Finding",
   "qa-result": "QA result",
   "knowledge-card": "Knowledge card",
@@ -94,6 +99,11 @@ export async function createSchemaContractValidators(
 
   return {
     "scout-output": createValidator<ScoutOutput>(ajv, schemas, "scout-output"),
+    "architecture-output": createValidator<ArchitectureOutput>(
+      ajv,
+      schemas,
+      "architecture-output",
+    ),
     finding: createValidator<Finding>(ajv, schemas, "finding"),
     "qa-result": createValidator<QaResult>(ajv, schemas, "qa-result"),
     "knowledge-card": createValidator<KnowledgeCard>(

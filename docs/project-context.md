@@ -53,13 +53,18 @@ agent contracts, parses JSON output, records malformed JSON and schema
 violations, and writes validation reports under the run workspace for QA and
 retry routing. Evidence validation now deterministically checks cited repository
 paths, line ranges, high-confidence finding evidence, QA finding references, and
-knowledge-card references to approved findings before semantic QA. The first
-runtime CLI vertical slice now parses `inspector run`, validates repository and
-objective paths, creates a run workspace, indexes the repository, initializes
-memory, builds an auditable Scout prompt with repository index context, runs
-Scout through a deterministic fake runner, validates Scout's structured schema
-and evidence, appends Scout findings to candidate memory, writes artifacts, and
-prints progress. Full multi-agent orchestration is still pending.
+knowledge-card references to approved findings before semantic QA. The runtime
+CLI slice now parses `inspector run`, validates repository and objective paths,
+creates a run workspace, indexes the repository, initializes memory, builds an
+auditable Scout prompt with repository index context, runs Scout through the
+runner port, validates Scout's structured schema and evidence, appends Scout
+findings to candidate memory, then runs Architecture with Scout output,
+repository index context, blackboard memory, and the objective. Architecture
+output is validated against a structured `architecture-output` contract covering
+layer map, dependency direction, module boundaries, business logic location,
+framework glue location, architecture risks, and candidate findings; all cited
+evidence is checked before Architecture findings are appended to candidate
+memory. Full scheduler-driven multi-agent orchestration is still pending.
 
 ## Non-Goals
 
