@@ -1,0 +1,18 @@
+{
+  "id": "revision-001",
+  "findingId": "finding-001",
+  "qaResultId": "qa-001",
+  "requestedBy": "qa-inspector",
+  "targetAgent": "architecture-inspector",
+  "issues": [
+    {
+      "check": "evidence-present",
+      "status": "failed",
+      "message": "Finding evidence must include a traceable file and line range."
+    }
+  ],
+  "requiredCorrections": [
+    "Narrow the evidence range to the relevant lines."
+  ],
+  "createdAt": "2026-06-20T02:05:00.000Z"
+}

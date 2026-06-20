@@ -1,0 +1,13 @@
+{
+  "check": "evidence-present",
+  "status": "failed",
+  "message": "Finding evidence must include a traceable file and line range.",
+  "evidence": [
+    {
+      "file": "src/adapters/cli/main.ts",
+      "lineStart": 12,
+      "lineEnd": 20,
+      "findingId": "finding-001"
+    }
+  ]
+}

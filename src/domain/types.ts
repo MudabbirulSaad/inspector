@@ -2,6 +2,8 @@ export type Severity = "info" | "low" | "medium" | "high" | "critical";
 
 export type QaStatus = "passed" | "failed" | "needs-review";
 
+export type QaIssueStatus = Exclude<QaStatus, "passed">;
+
 export type KnowledgeCardAudience = "coding-agent" | "engineer" | "maintainer";
 
 export type MemoryEventType =
@@ -14,19 +16,46 @@ export type MemoryEventType =
 
 export type ValidationCommandStatus = "passed" | "failed" | "not-run";
 
-export interface FindingEvidence {
+export type AgentId = string;
+
+export type AgentRole =
+  | "architecture"
+  | "code-quality"
+  | "security"
+  | "testing"
+  | "documentation"
+  | "qa"
+  | "knowledge"
+  | "reporting";
+
+export type AgentStatus =
+  | "planned"
+  | "ready"
+  | "running"
+  | "submitted"
+  | "validating"
+  | "accepted"
+  | "rejected"
+  | "rerouted";
+
+export type InspectionRunStatus = "planned" | "running" | "completed" | "failed";
+
+export interface Evidence {
   file: string;
   lineStart: number;
   lineEnd: number;
   excerpt?: string;
+  findingId?: string;
 }
+
+export type FindingEvidence = Evidence;
 
 export interface Finding {
   id: string;
-  agent: string;
+  agent: AgentId;
   severity: Severity;
   claim: string;
-  evidence: FindingEvidence[];
+  evidence: Evidence[];
   recommendation: string;
   confidence: number;
   validation?: string[];
@@ -40,28 +69,41 @@ export interface QaCheck {
 
 export interface QaResult {
   id: string;
-  qaAgent: string;
+  qaAgent: AgentId;
   findingId: string;
   status: QaStatus;
   rationale: string;
   checks: QaCheck[];
   requiresFollowUp: boolean;
-  followUpAgent?: string;
+  followUpAgent?: AgentId;
   createdAt?: string;
 }
 
-export interface KnowledgeCardEvidence {
-  file: string;
-  lineStart: number;
-  lineEnd: number;
-  findingId?: string;
+export interface QaIssue {
+  check: string;
+  status: QaIssueStatus;
+  message: string;
+  evidence?: Evidence[];
 }
+
+export interface RevisionRequest {
+  id: string;
+  findingId: string;
+  qaResultId: string;
+  requestedBy: AgentId;
+  targetAgent: AgentId;
+  issues: QaIssue[];
+  requiredCorrections: string[];
+  createdAt: string;
+}
+
+export type KnowledgeCardEvidence = Evidence;
 
 export interface KnowledgeCard {
   id: string;
   topic: string;
   summary: string;
-  evidence: KnowledgeCardEvidence[];
+  evidence: Evidence[];
   tags: string[];
   audience: KnowledgeCardAudience;
   createdAt?: string;
@@ -77,10 +119,30 @@ export interface MemoryEvent {
   nextSteps?: string[];
 }
 
-export interface InspectionRepository {
+export interface RepositoryTarget {
   name: string;
   root: string;
   commit?: string;
+}
+
+export type InspectionRepository = RepositoryTarget;
+
+export interface AgentAttempt {
+  id: string;
+  agentId: AgentId;
+  role: AgentRole;
+  status: AgentStatus;
+  startedAt: string;
+  completedAt?: string;
+  findings?: Finding[];
+}
+
+export interface RunConfig {
+  target: RepositoryTarget;
+  outputDirectory: string;
+  agentRoles: AgentRole[];
+  validationCommands: string[];
+  verbose: boolean;
 }
 
 export interface ValidationCommand {
@@ -96,11 +158,27 @@ export interface InspectionReportValidation {
 
 export interface InspectionReport {
   id: string;
-  repository: InspectionRepository;
+  repository: RepositoryTarget;
   generatedAt: string;
   summary: string;
   findings: Finding[];
   qaResults: QaResult[];
   knowledgeCards: KnowledgeCard[];
   validation: InspectionReportValidation;
+}
+
+export interface InspectionRun {
+  id: string;
+  target: RepositoryTarget;
+  config: RunConfig;
+  status: InspectionRunStatus;
+  attempts: AgentAttempt[];
+  findings: Finding[];
+  qaResults: QaResult[];
+  revisionRequests: RevisionRequest[];
+  memoryEvents: MemoryEvent[];
+  knowledgeCards: KnowledgeCard[];
+  report?: InspectionReport;
+  createdAt: string;
+  updatedAt: string;
 }

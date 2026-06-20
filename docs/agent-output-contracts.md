@@ -1,6 +1,14 @@
 # Agent Output Contracts
 
-Agent outputs must be structured, evidence-backed, and validation-friendly. The schemas in `schemas/` define the current contracts, and `examples/` contains small valid examples.
+Agent outputs and persisted run artifacts must be structured, evidence-backed,
+and validation-friendly. The schemas in `schemas/` define the current
+contracts, and `examples/` contains small valid examples.
+
+## Shared Evidence
+
+`evidence.schema.json` describes a traceable file and line range. Findings,
+QA issues, knowledge cards, and reports reuse this shape so evidence chains stay
+consistent across artifacts.
 
 ## Finding
 
@@ -9,6 +17,12 @@ Agent outputs must be structured, evidence-backed, and validation-friendly. The 
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required.
+
+## QA Issue and Revision Request
+
+`qa-issue.schema.json` describes an individual failed or review-needed QA check.
+`revision-request.schema.json` records how a failed QA result is routed back to
+the responsible follow-up agent, including required corrections.
 
 ## Knowledge Card
 
@@ -22,6 +36,18 @@ Agent outputs must be structured, evidence-backed, and validation-friendly. The 
 
 `inspection-report.schema.json` combines repository metadata, findings, QA results, generated knowledge cards, summary text, and validation metadata. It is the top-level artifact for a completed inspection.
 
+## Repository, Agents, and Runs
+
+`repository-target.schema.json` describes the target repository under
+inspection. `agent-attempt.schema.json` records a single agent execution attempt
+with its role and lifecycle status. `run-config.schema.json` captures the
+validated configuration used to start an inspection. `inspection-run.schema.json`
+combines the target, config, attempts, findings, QA results, revision requests,
+memory events, knowledge cards, and optional final report for the run.
+
 ## Validation Principle
 
-Schemas define minimum acceptable structure. Passing schema validation does not prove a claim is correct; it proves the output is complete enough for review and downstream tooling.
+Schemas define minimum acceptable structure. Passing schema validation does not
+prove a claim is correct; it proves the output is complete enough for review and
+downstream tooling. TypeScript domain models in `src/domain/types.ts` must stay
+aligned with these schemas.

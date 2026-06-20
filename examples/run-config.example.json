@@ -1,0 +1,11 @@
+{
+  "target": {
+    "name": "example-service",
+    "root": "./example-service",
+    "commit": "abc1234"
+  },
+  "outputDirectory": "./inspection-output",
+  "agentRoles": ["architecture", "qa"],
+  "validationCommands": ["npm test"],
+  "verbose": true
+}

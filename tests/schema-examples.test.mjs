@@ -5,10 +5,17 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
 const contracts = [
+  "evidence",
   "finding",
   "qa-result",
+  "qa-issue",
+  "revision-request",
   "knowledge-card",
   "memory-event",
+  "repository-target",
+  "agent-attempt",
+  "run-config",
+  "inspection-run",
   "inspection-report",
 ];
 

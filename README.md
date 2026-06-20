@@ -14,14 +14,13 @@ The repository is currently in an agent-workflow governance milestone. Runtime C
 
 ## Current Validation
 
-The available validation checks JSON Schema contracts, examples, and TypeScript compilation:
+The available validation checks JSON Schema contracts, examples, TypeScript
+compilation, linting, and build output:
 
 ```bash
 npm install
 npm run validate
 ```
-
-Linting will be added when an ESLint configuration is introduced.
 
 ## Documentation
 

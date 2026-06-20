@@ -176,3 +176,41 @@ git status
 ```bash
 refactor(architecture): establish hexagonal source boundaries
 ```
+
+### Milestone 04: Schema-Aligned Domain Models
+
+#### Goal
+
+Implement TypeScript domain types aligned with existing JSON Schemas.
+
+#### Tasks
+
+- Added schema-backed domain models for inspection runs, repository targets,
+  agent identifiers, agent roles, agent statuses, agent attempts, findings,
+  evidence, QA results, QA issues, revision requests, memory events, knowledge
+  cards, inspection reports, and run config.
+- Promoted shared evidence and repository target contracts into standalone
+  schemas used by existing output schemas.
+- Added examples and schema validation coverage for the expanded contract set.
+- Kept domain models pure TypeScript with no Node API or adapter dependencies.
+
+#### TDD
+
+Added schema/example validation coverage and a public domain construction test
+before implementing the missing schemas and TypeScript model exports.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(domain): add schema-aligned inspection models
+```

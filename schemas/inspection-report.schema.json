@@ -7,16 +7,7 @@
   "required": ["id", "repository", "generatedAt", "summary", "findings", "qaResults", "knowledgeCards", "validation"],
   "properties": {
     "id": { "type": "string", "minLength": 1 },
-    "repository": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "root"],
-      "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "root": { "type": "string", "minLength": 1 },
-        "commit": { "type": "string", "minLength": 1 }
-      }
-    },
+    "repository": { "$ref": "repository-target.schema.json" },
     "generatedAt": { "type": "string", "format": "date-time" },
     "summary": { "type": "string", "minLength": 1 },
     "findings": {

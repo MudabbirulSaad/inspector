@@ -1,0 +1,54 @@
+{
+  "$id": "inspection-run.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Inspection Run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "target",
+    "config",
+    "status",
+    "attempts",
+    "findings",
+    "qaResults",
+    "revisionRequests",
+    "memoryEvents",
+    "knowledgeCards",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "target": { "$ref": "repository-target.schema.json" },
+    "config": { "$ref": "run-config.schema.json" },
+    "status": { "enum": ["planned", "running", "completed", "failed"] },
+    "attempts": {
+      "type": "array",
+      "items": { "$ref": "agent-attempt.schema.json" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    },
+    "qaResults": {
+      "type": "array",
+      "items": { "$ref": "qa-result.schema.json" }
+    },
+    "revisionRequests": {
+      "type": "array",
+      "items": { "$ref": "revision-request.schema.json" }
+    },
+    "memoryEvents": {
+      "type": "array",
+      "items": { "$ref": "memory-event.schema.json" }
+    },
+    "knowledgeCards": {
+      "type": "array",
+      "items": { "$ref": "knowledge-card.schema.json" }
+    },
+    "report": { "$ref": "inspection-report.schema.json" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

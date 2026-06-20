@@ -1,0 +1,35 @@
+{
+  "$id": "revision-request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Revision Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "findingId",
+    "qaResultId",
+    "requestedBy",
+    "targetAgent",
+    "issues",
+    "requiredCorrections",
+    "createdAt"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "findingId": { "type": "string", "minLength": 1 },
+    "qaResultId": { "type": "string", "minLength": 1 },
+    "requestedBy": { "type": "string", "minLength": 1 },
+    "targetAgent": { "type": "string", "minLength": 1 },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "qa-issue.schema.json" }
+    },
+    "requiredCorrections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

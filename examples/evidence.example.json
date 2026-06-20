@@ -1,0 +1,7 @@
+{
+  "file": "src/adapters/cli/main.ts",
+  "lineStart": 12,
+  "lineEnd": 20,
+  "excerpt": "The entrypoint parses input and starts inspection orchestration.",
+  "findingId": "finding-001"
+}

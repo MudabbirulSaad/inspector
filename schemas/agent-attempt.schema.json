@@ -1,0 +1,42 @@
+{
+  "$id": "agent-attempt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Attempt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "agentId", "role", "status", "startedAt"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "agentId": { "type": "string", "minLength": 1 },
+    "role": {
+      "enum": [
+        "architecture",
+        "code-quality",
+        "security",
+        "testing",
+        "documentation",
+        "qa",
+        "knowledge",
+        "reporting"
+      ]
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "ready",
+        "running",
+        "submitted",
+        "validating",
+        "accepted",
+        "rejected",
+        "rerouted"
+      ]
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    }
+  }
+}
