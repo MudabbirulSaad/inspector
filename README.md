@@ -1,59 +1,115 @@
 # Inspector
 
-`inspector` is a Node.js and TypeScript CLI for AI-assisted codebase inspection. It will coordinate specialist inspection agents, validate evidence-backed findings, and produce documentation artifacts that future coding agents can reuse.
+`inspector` is a local Node.js and TypeScript CLI for orchestrating AI-assisted
+codebase inspections. It indexes a target repository, builds prompts for
+specialist inspection agents, validates their structured output, runs
+deterministic QA over evidence-backed findings, routes failed QA results back to
+the owning agent, and writes final case-study documentation plus RAG-ready
+knowledge cards.
 
-The current runtime slice supports Scout, Architecture, Pattern Miner, Flow Tracer, Testing Strategy, Tradeoff Analyst, deterministic QA verification, final case-study docs, and RAG knowledge cards. It creates a run workspace, indexes a repository, initializes memory, builds audited prompts from repository index context and prior specialist outputs, validates each agent's structured output and evidence, appends candidate findings to memory, and then separates approved and rejected findings with QA results, QA issues, revision requests, and a readiness score.
+The current CLI supports a fixed V1 inspection sequence:
 
-The current standalone CLI runtime uses a deterministic fake runner by default.
-Declarative config files can select the fake runner or a process-backed runner
-with an explicit local command.
+1. Scout
+2. Architecture
+3. Pattern Miner
+4. Flow Tracer
+5. Testing Strategy
+6. Tradeoff Analyst
+7. Deterministic QA and owner-agent revision attempts
+8. Final docs and RAG card writing
 
-```bash
-inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose] [--debug]
-inspector run inspection.yaml
-```
+By default, the standalone CLI uses a deterministic fake runner so the pipeline
+can run without network access or a Codex dependency. Configure a process-backed
+runner when you want to invoke a local Codex CLI command.
 
-Detected quality commands are not executed by default. Use
-`--run-quality-commands` or config `runQualityCommands: true` only for trusted
-repositories; disabled runs still write `validation/command_report.json` with a
-skipped reason. When execution is enabled, Testing Strategy command claims are
-checked against that report.
+## What It Does
 
-Use `--verbose` to stream professional inspection progress, including indexing,
-agent lifecycle, validation, retry, QA, and final output locations. Stack traces
-are hidden by default and shown only with `--debug`.
+- Creates an auditable run workspace under the configured output directory.
+- Writes repository index artifacts for file tree, important files, stack
+  signals, and detected quality commands.
+- Builds and stores exact prompts for each specialist attempt.
+- Validates agent JSON output against schemas and cited file/line evidence.
+- Stores append-only run memory for findings, QA issues, decisions, and
+  blackboard snapshots.
+- Runs QA over candidate findings and records approved, rejected, and unresolved
+  results.
+- Retries owner agents when QA creates revision requests and retries remain.
+- Emits a fixed Markdown case-study package under `final/docs/`.
+- Emits JSONL RAG card streams under `final/rag_cards/`.
+- Supports `status` and `resume` for existing run workspaces.
 
-Config files support `repoPath`, `outputPath`, `objective`, `targetContext`,
-`agents`, `parallelism`, `maxRetries`, `runQualityCommands`, `verbose`, and
-`runner`. Existing CLI flags such as `--objective`, `--out`, and `--verbose`
-override config values where they apply. Custom `agents` selection and
-`parallelism > 1` are reserved until scheduler-driven orchestration is wired
-into the user-facing runtime.
+## What It Does Not Do
 
-## Goals
+- It is not a hosted service or web UI.
+- It does not execute detected repository quality commands unless explicitly
+  enabled for a trusted repository.
+- It does not accept findings without schema-valid output and traceable
+  repository evidence.
+- It does not publish rejected findings into final docs or RAG cards.
+- It does not currently expose custom runtime agent selection or `parallelism >
+  1`; those fail clearly until scheduler-driven runtime orchestration is wired.
+- It does not make the domain model depend on Codex. Codex is one possible
+  runner behind a port.
 
-- Inspect a target repository through a local-first CLI.
-- Orchestrate specialist agents with dependency-aware execution.
-- Require evidence-backed, schema-valid outputs.
-- Route failed QA findings back to the responsible agent.
-- Produce case-study documentation and RAG-ready knowledge cards.
-
-## Current Validation
-
-The available validation checks JSON Schema contracts, examples, TypeScript
-compilation, linting, and build output:
+## Quick Start
 
 ```bash
 npm install
-npm run validate
+npm run build
+```
+
+Create an objective file:
+
+```bash
+printf 'Inspect the architecture and testing strategy for reuse opportunities.\n' > objective.md
+```
+
+Run the local fake-runner pipeline:
+
+```bash
+npm run dev -- run ./tests/fixtures/tiny-node-app --objective ./objective.md --out ./.inspector-runs --verbose
+```
+
+Inspect an existing run:
+
+```bash
+npm run dev -- status ./.inspector-runs/<run-directory>
+npm run dev -- resume ./.inspector-runs/<run-directory>
+```
+
+For package-style usage after building:
+
+```bash
+node dist/index.js run <repo-path> --objective <objective-file> --out <output-path>
 ```
 
 ## Documentation
 
+- [Getting started](docs/getting-started.md)
+- [CLI usage](docs/cli-usage.md)
+- [Configuration reference](docs/config-reference.md)
+- [Agent authoring](docs/agent-authoring.md)
+- [Output format](docs/output-format.md)
+- [RAG cards](docs/rag-cards.md)
+- [Development guide](docs/development-guide.md)
 - [Project context](docs/project-context.md)
 - [Architecture](docs/architecture.md)
 - [AI-assisted workflow](docs/ai-assisted-workflow.md)
-- [Testing strategy](docs/testing-strategy.md)
 - [Agent output contracts](docs/agent-output-contracts.md)
-- [Case study](docs/case-study.md)
-- [Agent instructions](AGENTS.md)
+
+## Validation
+
+Run the full local gate:
+
+```bash
+npm run validate
+```
+
+Or run individual checks:
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
