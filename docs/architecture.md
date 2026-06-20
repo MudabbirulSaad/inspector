@@ -108,6 +108,8 @@ Adapter responsibilities include:
   reasons for validation. The fake agent runner is deterministic for tests. The
   process-backed Codex runner requires explicit local CLI command configuration
   and delegates command execution to the process runner port.
+- Agent status artifact adapters write deterministic lifecycle status snapshots
+  into each agent attempt folder.
 - Memory adapters persist local swarm events without exposing raw prompts,
   transcripts, secrets, or private state in public docs. Run memory is
   append-only and lives under the run workspace `memory/` folder.
@@ -133,6 +135,7 @@ Expected ports include:
 - `MemoryStore` for local operational swarm memory.
 - `PromptTemplateReader` for loading shared and agent-specific prompt templates.
 - `PromptArtifactWriter` for saving exact run-specific agent prompts.
+- `AgentStatusArtifactWriter` for saving serialized lifecycle status snapshots.
 - `ArtifactValidator` for schema-backed runtime artifact checks used before
   writing memory or final outputs.
 - `FindingValidator`, `QaValidator`, `KnowledgeCardValidator`, and
@@ -144,19 +147,21 @@ Expected ports include:
 
 ## Agent Lifecycle
 
-An inspection agent moves through these application-owned stages:
+An inspection agent moves through these application-owned lifecycle states:
+`PENDING`, `RUNNING`, `OUTPUT_RECEIVED`, `SCHEMA_VALIDATED`,
+`EVIDENCE_VALIDATED`, `QA_REVIEWED`, `APPROVED`, `SCHEMA_FAILED`,
+`EVIDENCE_FAILED`, `QA_FAILED`, `RETRYING`, and `FAILED`.
 
-1. Planned with a role, scope, dependencies, and output contract.
-2. Ready when all upstream dependencies have completed successfully.
-3. Running through an external runner adapter.
-4. Submitted with structured output.
-5. Validated against schemas, evidence rules, and QA requirements.
-6. Accepted for final assembly or rejected with a revision request.
-7. Rerouted when QA identifies missing evidence, invalid claims, or incomplete
-   follow-up.
+The lifecycle state machine rejects invalid transitions, increments attempts
+when an agent enters `RUNNING`, records transition history with timestamps and
+optional reasons, and treats `APPROVED` and `FAILED` as terminal states. Failed
+schema, evidence, and QA gates may transition to `RETRYING` or `FAILED`; retry
+attempts re-enter the runner through `RUNNING`.
 
 Agents produce findings and supporting material. The orchestrator owns lifecycle
-state and workflow transitions.
+state and workflow transitions, and status snapshots are serialized as
+`status.json` artifacts under `agents/<agent-id>/attempt-<n>/` in the run
+workspace.
 
 ## Agent Registry
 

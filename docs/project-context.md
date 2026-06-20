@@ -42,7 +42,10 @@ is abstracted behind an `AgentRunner` port with deterministic fake and
 process-backed Codex adapters. The process-backed adapter requires explicit
 local CLI command configuration and uses a real process runner for stdout,
 stderr, streaming events, working directory, timeout, and structured result
-handling. Runtime CLI behavior is still pending.
+handling. Agent lifecycle state is now modeled as an auditable state machine
+with attempt tracking, deterministic status serialization, and filesystem
+status artifacts under each agent attempt folder. Runtime CLI behavior is still
+pending.
 
 ## Non-Goals
 

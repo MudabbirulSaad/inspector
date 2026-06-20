@@ -7,6 +7,7 @@ export * from "./detect-repository-commands.js";
 export * from "./append-swarm-memory.js";
 export * from "./build-agent-prompt.js";
 export * from "./execute-agent-run.js";
+export * from "./write-agent-lifecycle-status.js";
 
 export const applicationBoundary = "application" as const;
 

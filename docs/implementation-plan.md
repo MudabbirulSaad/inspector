@@ -32,7 +32,9 @@ execution, or final writer adapters. Filesystem adapters now exist for
 auditable run workspace creation, deterministic repository indexing,
 append-only run memory, prompt template loading, and prompt artifact writing.
 Runner ports now exist with deterministic fake and process-backed Codex agent
-runners plus a real Node process runner for local command execution.
+runners plus a real Node process runner for local command execution. Agent
+lifecycle transitions are now modeled as an auditable state machine with status
+artifacts written to agent attempt folders.
 
 ## Fixed Milestones
 
@@ -601,4 +603,47 @@ git status
 
 ```bash
 feat(codex): run agents through process adapter
+```
+
+### Milestone 14: Agent Lifecycle State Machine
+
+#### Goal
+
+Implement auditable lifecycle transitions.
+
+#### Tasks
+
+- Added a pure domain lifecycle state machine for `PENDING`, `RUNNING`,
+  `OUTPUT_RECEIVED`, `SCHEMA_VALIDATED`, `EVIDENCE_VALIDATED`, `QA_REVIEWED`,
+  `APPROVED`, `SCHEMA_FAILED`, `EVIDENCE_FAILED`, `QA_FAILED`, `RETRYING`, and
+  `FAILED`.
+- Rejected invalid transitions and terminal-state transitions.
+- Tracked attempts by incrementing the count whenever a lifecycle enters
+  `RUNNING`.
+- Serialized status snapshots deterministically with transition history,
+  timestamps, and optional reasons.
+- Added an application status artifact writer port and filesystem adapter that
+  writes `agents/<agent-id>/attempt-<n>/status.json` in the run workspace.
+
+#### TDD
+
+Added lifecycle tests one behavior at a time for valid approval transitions,
+invalid transition rejection, retry transitions, evidence and QA failure
+branches, terminal states, deterministic serialization, and status artifact
+writing.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): model auditable lifecycle transitions
 ```

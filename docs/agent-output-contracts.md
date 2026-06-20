@@ -85,3 +85,17 @@ callers to provide the local command and argument template explicitly, then
 returns stdout, stderr, exit code, timestamps, output artifact paths, streaming
 events, and failure reasons. Tests exercise the real process path with harmless
 fixture commands rather than invoking a live Codex CLI.
+
+## Lifecycle Status
+
+The orchestrator owns agent lifecycle state. The lifecycle state machine uses
+`PENDING`, `RUNNING`, `OUTPUT_RECEIVED`, `SCHEMA_VALIDATED`,
+`EVIDENCE_VALIDATED`, `QA_REVIEWED`, `APPROVED`, `SCHEMA_FAILED`,
+`EVIDENCE_FAILED`, `QA_FAILED`, `RETRYING`, and `FAILED`. It rejects invalid
+transitions, increments attempts each time an agent enters `RUNNING`, and treats
+`APPROVED` and `FAILED` as terminal states.
+
+Serialized status snapshots include the agent id, current status, attempt
+count, creation and update timestamps, and transition history. The filesystem
+adapter writes the snapshot to
+`agents/<agent-id>/attempt-<n>/status.json`.

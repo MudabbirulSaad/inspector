@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+  AgentStatusArtifactWriter,
   PromptArtifactWriter,
   PromptTemplateReader,
   RepositoryEntry,
@@ -174,6 +175,27 @@ export class NodePromptArtifactWriter implements PromptArtifactWriter {
       `attempt-${request.attempt}`,
     );
     const path = join(directory, "prompt.md");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+export class NodeAgentStatusArtifactWriter implements AgentStatusArtifactWriter {
+  async writeAgentStatus(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.agents,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "status.json");
 
     await mkdir(directory, { recursive: true });
     await writeFile(path, request.content);
