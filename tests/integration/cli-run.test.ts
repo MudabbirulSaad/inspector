@@ -1812,6 +1812,39 @@ test("CLI run sends Testing Strategy a prompt containing prior specialist output
   assert.match(prompt, /commandEvidence/);
 });
 
+test("CLI run sends Testing Strategy a dedicated trusted quality command report", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunnerWithPassedCommandEvidence();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+      "--run-quality-commands",
+    ],
+    clock: fixedClock,
+    runner,
+    processRunner: new RecordingProcessRunner(),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(runner.requests[4]?.agentId, "testing_strategy");
+  const prompt = runner.requests[4]?.prompt ?? "";
+  assert.match(prompt, /## Trusted Quality Command Report/);
+  assert.match(prompt, /npm test/);
+  assert.match(prompt, /authoritative/);
+  assert.match(prompt, /Do not invent or aggregate commands/);
+  assert.match(
+    prompt,
+    /Do not claim npm run validate passed unless npm run validate appears in the command report\./,
+  );
+});
+
 test("CLI run sends Tradeoff Analyst a prompt containing prior risk and pattern outputs", async () => {
   const fixture = await createFixture();
   const runner = successfulRunner();
@@ -2564,6 +2597,66 @@ test("CLI run fails when Scout output is not schema-valid", async () => {
     "SCHEMA_FAILED",
     "FAILED",
   ]);
+});
+
+test("CLI run rejects bad Testing Strategy aggregate command claims before writing final docs", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const badTestingStrategyOutput = {
+    ...testingStrategyOutput,
+    qualityGates: [
+      {
+        ...testingStrategyOutput.qualityGates[0],
+        command: "npm run validate",
+        status: "passed",
+        summary: "Aggregate validation passed.",
+      },
+    ],
+    commandEvidence: [
+      {
+        command: "npm run validate",
+        status: "passed",
+        exitCode: 0,
+        ranAt: "2026-06-20T01:02:03.004Z",
+        evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+      "--run-quality-commands",
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(),
+        successfulTestingStrategyResult(JSON.stringify(badTestingStrategyOutput)),
+      ],
+    }),
+    processRunner: new RecordingProcessRunner(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /Testing Strategy schema validation failed: .*no matching quality command report entry/,
+  );
+  assert.ok(result.workspace);
+  await assert.rejects(
+    stat(join(result.workspace.root, "final", "docs", "00-executive-summary.md")),
+  );
 });
 
 test("CLI run reports useful failures without stack traces by default", async () => {

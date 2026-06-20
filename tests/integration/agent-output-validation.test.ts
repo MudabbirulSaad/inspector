@@ -242,6 +242,63 @@ test("agent output validator rejects Testing Strategy passed command claims miss
   );
 });
 
+test("agent output validator rejects aggregate Testing Strategy command claims not present in the command report", async () => {
+  const reports = new InMemoryValidationReports();
+  const output = await readExampleObject("testing-strategy-output");
+  output.qualityGates = [
+    {
+      command: "npm run validate",
+      status: "passed",
+      summary: "Aggregate validation passed.",
+      evidence: [{ file: "package.json", lineStart: 1, lineEnd: 12 }],
+    },
+  ];
+  output.commandEvidence = [
+    {
+      command: "npm run validate",
+      status: "passed",
+      exitCode: 0,
+      ranAt: "2026-06-20T01:02:03.004Z",
+      evidence: [{ file: "package.json", lineStart: 1, lineEnd: 12 }],
+    },
+  ];
+
+  const result = await validateAgentOutput({
+    workspace,
+    agent: getAgentContract("testing_strategy"),
+    attempt: 1,
+    rawOutput: JSON.stringify(output),
+    validators: await createSchemaContractValidators(),
+    reports,
+    qualityCommandReport: {
+      commands: [
+        qualityCommand("npm", ["test"]),
+        qualityCommand("npm", ["run", "typecheck"]),
+        qualityCommand("npm", ["run", "lint"]),
+        qualityCommand("npm", ["run", "build"]),
+      ],
+    },
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /no matching quality command report entry.*npm run validate|npm run validate.*no matching quality command report entry/,
+  );
+});
+
+test("agent output validator accepts exact Testing Strategy command matches from the command report", async () => {
+  const result = await validateTestingStrategyWithCommandReport({
+    commandEvidenceStatus: "passed",
+    qualityGateStatus: "passed",
+    report: {
+      commands: [qualityCommand("npm", ["test"])],
+    },
+  });
+
+  assert.equal(result.valid, true);
+});
+
 async function validateTestingStrategyWithCommandReport(input: {
   commandEvidenceStatus: "passed" | "failed" | "not-run";
   qualityGateStatus: "passed" | "failed" | "not-run";
@@ -295,15 +352,26 @@ function commandReport(status: "passed" | "failed"): QualityCommandReport {
   return {
     commands: [
       {
-        command: "npm",
-        args: ["test"],
+        ...qualityCommand("npm", ["test"]),
         exitCode: status === "passed" ? 0 : 1,
-        stdout: "",
-        stderr: "",
-        durationMs: 10,
         status,
       },
     ],
+  };
+}
+
+function qualityCommand(
+  command: string,
+  args: string[],
+): QualityCommandReport["commands"][number] {
+  return {
+    command,
+    args,
+    exitCode: 0,
+    stdout: "ok",
+    stderr: "",
+    durationMs: 100,
+    status: "passed",
   };
 }
 

@@ -57,6 +57,9 @@ export async function runAgentWorkflowStep(input: {
     previousOutputs: input.previousOutputs,
     memorySnapshot: input.memorySnapshot,
     revisionRequest: input.revisionRequest,
+    ...(input.qualityCommandReport === undefined
+      ? {}
+      : { qualityCommandReport: input.qualityCommandReport }),
     outputSchema: await input.input.schemaReader.readAgentOutputSchema(
       agent.outputSchema,
     ),
