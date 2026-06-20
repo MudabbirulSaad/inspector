@@ -53,8 +53,12 @@ agent contracts, parses JSON output, records malformed JSON and schema
 violations, and writes validation reports under the run workspace for QA and
 retry routing. Evidence validation now deterministically checks cited repository
 paths, line ranges, high-confidence finding evidence, QA finding references, and
-knowledge-card references to approved findings before semantic QA. Runtime CLI
-behavior is still pending.
+knowledge-card references to approved findings before semantic QA. The first
+runtime CLI vertical slice now parses `inspector run`, validates repository and
+objective paths, creates a run workspace, indexes the repository, initializes
+memory, runs Scout through a deterministic fake runner, validates Scout schema
+and evidence, writes artifacts, and prints progress. Full multi-agent
+orchestration is still pending.
 
 ## Non-Goals
 

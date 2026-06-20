@@ -1,3 +1,9 @@
+#!/usr/bin/env node
+
+import { fileURLToPath } from "node:url";
+
+import { runInspectorCli } from "./adapters/cli/index.js";
+
 export * from "./adapters/index.js";
 export * from "./agents/index.js";
 export * from "./application/index.js";
@@ -22,3 +28,11 @@ export const sourceBoundaries = [
 ] as const;
 
 export type SourceBoundary = (typeof sourceBoundaries)[number];
+
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const result = await runInspectorCli({
+    argv: process.argv.slice(2),
+  });
+
+  process.exitCode = result.exitCode;
+}

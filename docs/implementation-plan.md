@@ -26,20 +26,20 @@ contract-first baseline:
 - TypeScript domain contract interfaces in `src/domain/types.ts`.
 - Package scripts for tests, type checking, build, and aggregate validation.
 
-Runtime CLI implementation has not started. The current source tree does not
-contain CLI argument parsing, full orchestration services, real process
-execution, or final writer adapters. Filesystem adapters now exist for
-auditable run workspace creation, deterministic repository indexing,
-append-only run memory, prompt template loading, and prompt artifact writing.
-Runner ports now exist with deterministic fake and process-backed Codex agent
-runners plus a real Node process runner for local command execution. Agent
-lifecycle transitions are now modeled as an auditable state machine with status
-artifacts written to agent attempt folders. Agent output validation now parses
-raw JSON, selects schemas from agent contracts, reports malformed JSON and
-schema violations, and writes validation reports to the run workspace. Evidence
-validation now checks cited files, line ranges, repository-contained paths,
-high-confidence finding evidence, QA finding references, and knowledge-card
-approved-finding references.
+Runtime CLI implementation has started with a Scout-only `inspector run`
+vertical slice. Full multi-agent orchestration services, real Codex runner
+configuration, QA routing, and final writer adapters are still pending.
+Filesystem adapters now exist for auditable run workspace creation,
+deterministic repository indexing, append-only run memory, prompt template
+loading, and prompt artifact writing. Runner ports now exist with deterministic
+fake and process-backed Codex agent runners plus a real Node process runner for
+local command execution. Agent lifecycle transitions are now modeled as an
+auditable state machine with status artifacts written to agent attempt folders.
+Agent output validation now parses raw JSON, selects schemas from agent
+contracts, reports malformed JSON and schema violations, and writes validation
+reports to the run workspace. Evidence validation now checks cited files, line
+ranges, repository-contained paths, high-confidence finding evidence, QA finding
+references, and knowledge-card approved-finding references.
 
 ## Fixed Milestones
 
@@ -773,4 +773,56 @@ git status
 
 ```bash
 feat(validation): verify evidence paths and line ranges
+```
+
+### Milestone 18: First CLI `run` Vertical Slice
+
+#### Goal
+
+Implement the first user-visible CLI run path.
+
+#### Command
+
+```bash
+inspector run <repo-path> --objective <objective-file> --out <output-path> --verbose
+```
+
+#### Tasks
+
+- Added a package binary entrypoint for `inspector`.
+- Parsed `run`, repository path, `--objective`, `--out`, and `--verbose`
+  arguments in the CLI adapter.
+- Validated that the repository path exists and is a directory.
+- Validated that the objective file exists and is a file.
+- Created an auditable run workspace with the existing workspace adapter.
+- Indexed the repository into `repo_index/` artifacts.
+- Initialized run memory with a blackboard entry.
+- Ran Scout through an injected fake runner in tests, with a deterministic
+  default fake runner for the first standalone CLI slice.
+- Validated Scout output against the finding schema.
+- Validated Scout evidence against repository file and line metadata.
+- Wrote Scout output, schema validation, evidence validation, memory, and
+  repository index artifacts.
+- Printed progress in verbose mode and the final workspace path on success.
+
+#### TDD
+
+Added integration tests around the public CLI adapter for a valid command,
+missing repository path, missing objective file, fake Scout output, created
+artifacts, and verbose output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(cli): run scout inspection vertical slice
 ```

@@ -4,6 +4,9 @@
   "description": "CLI for orchestrating Codex-powered codebase inspection swarms.",
   "private": true,
   "type": "module",
+  "bin": {
+    "inspector": "./dist/index.js"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts tests/unit/*.test.ts tests/integration/*.test.ts",
