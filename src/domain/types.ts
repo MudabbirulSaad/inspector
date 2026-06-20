@@ -374,6 +374,7 @@ export interface RunConfig {
   parallelism?: number;
   maxRetries?: number;
   runQualityCommands?: boolean;
+  publicDocsDirectory?: string;
   runner?: {
     provider: string;
     command?: string;

@@ -69,9 +69,15 @@ QA, while loading line counts only for cited repository files. QA verification
 now reviews candidate findings against schema and evidence reports, rejects
 unsupported or contradictory findings, creates owner-agent revision requests,
 writes QA artifacts, appends approved/rejected findings to run memory, and
-computes a deterministic readiness score. The runtime CLI slice now parses
-direct `inspector run <repo-path> --objective <file> --out <path>` commands and
-declarative `inspector run inspection.yaml` config files. Config files support
+computes a deterministic readiness score. The runtime CLI slice now opens an
+interactive wizard for `inspector` or `node dist/main.js` with no arguments,
+while still parsing direct
+`inspector run <repo-path> --objective <file> --out <path>` commands and
+declarative `inspector run inspection.yaml` config files. The wizard defaults
+to the current repository, `./docs/inspector` public docs, OS user-data
+internal run storage, the fake runner, and skipped quality commands; it requires
+explicit confirmation for Codex full-auto/YOLO and quality-command execution.
+Config files support
 repository path, output path, inline objective, target context, selected agents,
 parallelism, max retries, trusted quality-command execution, verbosity, and
 runner configuration, with CLI flags overriding config values where they apply.

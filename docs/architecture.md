@@ -102,6 +102,13 @@ Adapter responsibilities include:
 
 - CLI adapters parse arguments, handle user-visible errors, and call application
   use cases.
+- The no-argument CLI adapter opens the interactive release wizard. It collects
+  repository path, public docs output path, internal run data directory, runner
+  selection, optional process-backed Codex command and arguments, trusted
+  full-auto/YOLO consent, trusted quality-command consent, and final start
+  confirmation. The wizard stores internal run data through the user-data
+  workspace adapter by default and requires explicit confirmation before
+  enabling command-executing modes.
 - The CLI `run` adapter accepts either direct repository/objective/output
   arguments or a declarative YAML config file, applies reasonable CLI
   overrides, validates local repository and objective inputs, wires concrete
@@ -119,8 +126,8 @@ Adapter responsibilities include:
   owner schema and evidence rules, and followed by final QA so unresolved issues
   remain visible in QA artifacts when retries are exhausted. Configured
   `maxRetries` can reduce the owner-retry count for a run. The use case then
-  writes the fixed public `docs/inspector/` Markdown package, retains an
-  internal `final/docs/` Markdown copy, and writes the internal
+  writes the fixed public Markdown package to the configured public docs
+  directory, retains an internal `final/docs/` Markdown copy, and writes the internal
   `final/rag_cards/` JSONL package from the final approved findings. Shared
   application step logic handles prompt construction, runner execution, output
   persistence, schema validation, and lifecycle status through schema

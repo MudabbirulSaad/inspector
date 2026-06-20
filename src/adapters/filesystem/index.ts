@@ -472,14 +472,18 @@ export class NodeCaseStudyDocumentWriter implements CaseStudyDocumentWriter {
 export class NodePublicCaseStudyDocumentWriter
   implements CaseStudyDocumentWriter
 {
-  constructor(private readonly targetRepositoryRoot: string) {}
+  constructor(
+    private readonly targetRepositoryRoot: string,
+    private readonly outputDirectory?: string,
+  ) {}
 
   async writeCaseStudyDocument(request: {
     workspace: RunWorkspace;
     path: string;
     content: string;
   }): Promise<{ path: string }> {
-    const directory = join(this.targetRepositoryRoot, "docs", "inspector");
+    const directory =
+      this.outputDirectory ?? join(this.targetRepositoryRoot, "docs", "inspector");
     const path = join(directory, request.path);
 
     await mkdir(directory, { recursive: true });

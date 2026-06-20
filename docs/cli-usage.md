@@ -10,6 +10,33 @@ npm run dev -- --help
 node dist/main.js --help
 ```
 
+Start the interactive release wizard:
+
+```bash
+npx inspector
+node dist/main.js
+```
+
+The wizard asks for the repository path, public docs output path, internal run
+data directory, runner choice, optional Codex process command, trusted
+full-auto/YOLO consent, trusted quality-command consent, and final confirmation.
+Defaults are `.`, `./docs/inspector`, the OS Inspector user data directory, the
+fake runner, and no quality-command execution.
+
+When Codex full-auto/YOLO is selected, the wizard prints:
+
+```text
+This grants Codex permission to run commands in this trusted local repository. Use only on repositories you trust.
+```
+
+When quality command execution is selected, the wizard prints:
+
+```text
+Detected package scripts can execute arbitrary project code. Enable only for trusted repositories.
+```
+
+Both risky modes require explicit confirmation before the run can start.
+
 ## Run
 
 Direct repository/objective form:
@@ -36,6 +63,10 @@ Successful runs publish user-facing Markdown docs to
 printed as `Inspection run workspace:`. The public docs directory intentionally
 contains Markdown only; raw prompts, JSON validation reports, QA artifacts,
 memory streams, and RAG JSONL stay in the internal workspace.
+
+The interactive wizard can publish public Markdown to a custom docs directory.
+Non-interactive `run` keeps the compatible `<repo-path>/docs/inspector/`
+location.
 
 Useful flags:
 

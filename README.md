@@ -73,6 +73,12 @@ Run the local fake-runner pipeline:
 npm run dev -- run ./tests/fixtures/tiny-node-app --objective ./objective.md --out ./.inspector-runs --verbose
 ```
 
+After building, `node dist/main.js` or package-style `npx inspector` opens the
+interactive wizard. The wizard defaults to the current directory, publishes
+Markdown to `./docs/inspector`, stores internal run data under the OS Inspector
+user data directory, and uses the fake runner unless a process-backed Codex
+runner is selected.
+
 Inspect an existing run:
 
 ```bash
@@ -83,6 +89,7 @@ npm run dev -- resume ./.inspector-runs/<run-directory>
 For package-style usage after building:
 
 ```bash
+node dist/main.js
 node dist/main.js run <repo-path> --objective <objective-file> --out <output-path>
 ```
 

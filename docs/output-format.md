@@ -1,7 +1,7 @@
 # Output Format
 
-Inspector now separates public development docs from internal run data. Public
-Markdown docs are written to the inspected repository:
+Inspector separates public development docs from internal run data. By default,
+public Markdown docs are written to the inspected repository:
 
 ```text
 <target-repo>/docs/inspector/
@@ -19,8 +19,8 @@ Markdown docs are written to the inspected repository:
 
 Internal run artifacts live in a unique run workspace. The compatibility CLI
 path still creates that workspace under the configured `--out` directory. The
-release UX storage adapter creates the same workspace shape under the OS user
-data root:
+interactive release wizard creates the same workspace shape under the OS user
+data root unless the user chooses another internal data directory:
 
 ```text
 Linux:   XDG_DATA_HOME/inspector or ~/.local/share/inspector
@@ -121,10 +121,11 @@ QA artifacts preserve why a finding passed, failed, or needed revision.
 
 ## Public Docs
 
-`<target-repo>/docs/inspector/` contains the user-facing Markdown package.
-Public docs are Markdown only. They do not include raw prompts, raw runner
-output, schema reports, evidence JSON, QA JSON, memory JSONL, internal RAG
-JSONL, or configuration secrets.
+`<target-repo>/docs/inspector/` contains the user-facing Markdown package for
+non-interactive runs. The interactive wizard can publish the same Markdown
+package to a custom docs directory. Public docs are Markdown only. They do not
+include raw prompts, raw runner output, schema reports, evidence JSON, QA JSON,
+memory JSONL, internal RAG JSONL, or configuration secrets.
 
 ## Internal Final Docs
 

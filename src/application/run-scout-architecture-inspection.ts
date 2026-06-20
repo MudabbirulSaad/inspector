@@ -812,5 +812,9 @@ function countCitedFiles(findings: Finding[]): number {
 }
 
 function publicDocsPath(config: RunConfig): string {
+  if (config.publicDocsDirectory !== undefined) {
+    return config.publicDocsDirectory;
+  }
+
   return `${config.target.root}/docs/inspector`;
 }

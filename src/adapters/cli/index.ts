@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
@@ -41,9 +42,11 @@ import {
   NodeRepositoryIndexPromptContextReader,
   NodeRepositoryIndexWriter,
   NodeRepositoryReader,
+  NodeRunDataWorkspaceStore,
   NodeRunWorkspaceStore,
   NodeSplitCaseStudyDocumentWriter,
   NodeSwarmMemoryStore,
+  NodeUserDataDirectoryProvider,
   NodeValidationReportWriter,
 } from "../filesystem/index.js";
 import { NodeProcessRunner } from "../process/index.js";
@@ -56,6 +59,7 @@ export interface InspectorCliRequest {
   runner?: AgentRunner;
   processRunner?: ProcessRunner;
   events?: InspectionEventSink;
+  stdin?: NodeJS.ReadableStream;
   stdout?: (line: string) => void;
   stderr?: (line: string) => void;
 }
@@ -77,6 +81,7 @@ interface ParsedRunCommand {
   maxRetries?: number;
   runQualityCommands: boolean;
   runner?: InspectionConfigRunner;
+  publicDocsDirectory?: string;
 }
 
 interface InspectionConfigRunner {
@@ -119,6 +124,9 @@ export async function runInspectorCli(
       printHelp(stdout);
       return { exitCode: 0 };
     }
+    if (request.argv.length === 0) {
+      return await runInteractiveWizard(request, stdout);
+    }
     if (request.argv[0] === "status") {
       await printRunStatus(request.argv, stdout);
       return { exitCode: 0 };
@@ -131,77 +139,19 @@ export async function runInspectorCli(
 
     const command = await parseRunCommand(request.argv);
     debug = command.debug;
-    await assertDirectory(command.repoPath, "Repository path");
-
-    const objective = appendTargetContext(command.objective, command.targetContext);
-    const repoRoot = resolve(command.repoPath);
-    const repositoryReader = new NodeRepositoryReader(repoRoot);
-    const repositoryEntries = await repositoryReader.listEntries();
-    const processRunner = request.processRunner ?? new NodeProcessRunner();
-    const config: RunConfig = {
-      target: {
-        name: basename(repoRoot),
-        root: repoRoot,
-      },
-      outputDirectory: resolve(command.outPath),
-      agentRoles: ["documentation"],
-      validationCommands: [],
-      verbose: command.verbose,
-      ...(command.targetContext === undefined
-        ? {}
-        : { targetContext: command.targetContext }),
-      ...(command.agents === undefined ? {} : { agents: command.agents }),
-      ...(command.parallelism === undefined
-        ? {}
-        : { parallelism: command.parallelism }),
-      ...(command.maxRetries === undefined ? {} : { maxRetries: command.maxRetries }),
-      runQualityCommands: command.runQualityCommands,
-      ...(command.runner === undefined ? {} : { runner: command.runner }),
-    };
-
-    const eventSink = createCliEventSink({
+    const result = await executeRunCommand({
+      request,
+      command,
       stdout,
-      verbose: command.verbose,
-      external: request.events,
-    });
-    printProgress(stdout, command.verbose, `Inspection started: ${config.target.name}`);
-    const result = await runScoutArchitectureInspection({
-      config,
-      objective,
-      clock: request.clock ?? systemClock,
-      runner:
-        request.runner ??
-        (await createRunnerFromConfig(command.runner, repositoryReader, repositoryEntries)),
       workspaces: new NodeRunWorkspaceStore(),
-      repositoryReader,
-      repositoryIndexWriter: new NodeRepositoryIndexWriter(),
-      repositoryIndexContext: new NodeRepositoryIndexPromptContextReader(),
-      memory: (workspace) => new NodeSwarmMemoryStore(workspace),
-      promptTemplates: new NodePromptTemplateReader(promptRoot),
-      promptArtifacts: new NodePromptArtifactWriter(),
-      statusArtifacts: new NodeAgentStatusArtifactWriter(),
-      outputArtifacts: new NodeAgentOutputArtifactWriter(),
-      validationReports: new NodeValidationReportWriter(),
-      evidenceReports: new NodeEvidenceValidationReportWriter(),
-      qaArtifacts: new NodeQaArtifactWriter(),
-      qualityCommandReports: new NodeQualityCommandReportWriter(),
-      finalDocs: new NodeSplitCaseStudyDocumentWriter(
-        new NodeCaseStudyDocumentWriter(),
-        new NodePublicCaseStudyDocumentWriter(repoRoot),
-      ),
-      ragCards: new NodeRagKnowledgeCardWriter(),
-      processRunner,
-      validators: await createSchemaContractValidators(),
-      schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
-      events: eventSink,
-      progress: (message) => printProgress(stdout, command.verbose, message),
+      eventSink: createCliEventSink({
+        stdout,
+        verbose: command.verbose,
+        external: request.events,
+      }),
     });
 
-    printProgress(
-      stdout,
-      command.verbose,
-      `Final output: ${repoRoot}/docs/inspector`,
-    );
+    printProgress(stdout, command.verbose, `Final output: ${result.docsPath}`);
     stdout(`Inspection run workspace: ${result.workspace.root}`);
     return { exitCode: 0, workspace: result.workspace };
   } catch (error) {
@@ -215,7 +165,7 @@ export async function runInspectorCli(
 }
 
 function isHelpRequest(argv: string[]): boolean {
-  return argv.length === 0 || argv.includes("--help") || argv.includes("-h");
+  return argv.includes("--help") || argv.includes("-h");
 }
 
 function printHelp(stdout: (line: string) => void): void {
@@ -232,6 +182,324 @@ function printHelp(stdout: (line: string) => void): void {
   stdout("  --debug");
   stdout("  --run-quality-commands");
   stdout("  --help");
+}
+
+async function runInteractiveWizard(
+  request: InspectorCliRequest,
+  stdout: (line: string) => void,
+): Promise<InspectorCliResult> {
+  stdout("Interactive Inspector Wizard");
+  const input = await createWizardQuestioner(request.stdin);
+
+  try {
+    const repositoryPath = await askWithDefault(input, stdout, "Repository path", ".");
+    const repoRoot = resolve(repositoryPath);
+    const docsDefault = "./docs/inspector";
+    const docsInput = await askWithDefault(
+      input,
+      stdout,
+      "Public docs output path",
+      docsDefault,
+    );
+    const defaultDataRoot = await new NodeUserDataDirectoryProvider().getInspectorDataRoot();
+    const internalDataDirectory = await askWithDefault(
+      input,
+      stdout,
+      "Internal run data directory",
+      defaultDataRoot,
+    );
+    const runnerChoice = normalizeRunnerChoice(
+      await askWithDefault(
+        input,
+        stdout,
+        "Runner (fake/process)",
+        "fake",
+      ),
+    );
+    const runner =
+      runnerChoice === "fake"
+        ? { provider: "fake" }
+        : await askProcessRunner(input, stdout);
+
+    const runQualityCommands = await askYesNo(
+      input,
+      stdout,
+      "Execute quality commands?",
+      false,
+    );
+    if (runQualityCommands) {
+      stdout(
+        "Detected package scripts can execute arbitrary project code. Enable only for trusted repositories.",
+      );
+      const confirmed = await askExplicitConfirmation(
+        input,
+        stdout,
+        "Type yes to enable quality command execution",
+      );
+      if (!confirmed) {
+        throw new Error("Quality command execution requires explicit confirmation");
+      }
+    }
+
+    stdout("Specialist Agents");
+    for (const stage of runtimeStageIds) {
+      stdout(`- ${stage}: pending`);
+    }
+    stdout(`Final docs: ${resolveDocsPath(repoRoot, docsInput)}`);
+    stdout(`Internal data: ${resolve(internalDataDirectory)}`);
+
+    const confirmed = await askYesNo(input, stdout, "Start inspection?", false);
+    if (!confirmed) {
+      return { exitCode: 1 };
+    }
+
+    const docsPath = resolveDocsPath(repoRoot, docsInput);
+    const command: ParsedRunCommand = {
+      repoPath: repoRoot,
+      objective: "Inspect the repository and produce evidence-backed documentation.\n",
+      outPath: resolve(internalDataDirectory, "runs"),
+      verbose: false,
+      debug: false,
+      runQualityCommands,
+      runner,
+      publicDocsDirectory: docsPath,
+    };
+    const eventSink = createWizardEventSink({
+      stdout,
+      external: request.events,
+    });
+    const result = await executeRunCommand({
+      request,
+      command,
+      stdout,
+      workspaces: new NodeRunDataWorkspaceStore({
+        dataRoot: resolve(internalDataDirectory),
+      }),
+      eventSink,
+    });
+
+    stdout(`Final docs: ${result.docsPath}`);
+    stdout(`Internal data: ${result.workspace.root}`);
+    return { exitCode: 0, workspace: result.workspace };
+  } finally {
+    input.close();
+  }
+}
+
+interface WizardQuestioner {
+  question(prompt: string): Promise<string>;
+  close(): void;
+}
+
+async function createWizardQuestioner(
+  stdin: NodeJS.ReadableStream | undefined,
+): Promise<WizardQuestioner> {
+  if (stdin !== undefined) {
+    const chunks: string[] = [];
+    for await (const chunk of stdin) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk));
+    }
+    const lines = chunks.join("").split(/\r?\n/);
+    let index = 0;
+    return {
+      async question() {
+        const answer = lines[index] ?? "";
+        index += 1;
+        return answer;
+      },
+      close() {
+        return undefined;
+      },
+    };
+  }
+
+  const readline = createInterface({
+    input: process.stdin,
+    terminal: true,
+  });
+  return readline;
+}
+
+async function askProcessRunner(
+  input: WizardQuestioner,
+  stdout: (line: string) => void,
+): Promise<InspectionConfigRunner> {
+  const command = await askWithDefault(input, stdout, "Codex command", "codex");
+  const args = splitArgs(
+    await askWithDefault(input, stdout, "Codex command args", "exec {prompt}"),
+  );
+  const useFullAuto = await askYesNo(
+    input,
+    stdout,
+    "Use Codex full-auto/YOLO flag if supported?",
+    false,
+  );
+
+  const fullAutoArgs = useFullAuto ? addCodexFullAutoArg(args) : args;
+  if (useFullAuto) {
+    stdout(
+      "This grants Codex permission to run commands in this trusted local repository. Use only on repositories you trust.",
+    );
+    const confirmed = await askExplicitConfirmation(
+      input,
+      stdout,
+      "Type yes to enable Codex full-auto/YOLO",
+    );
+    if (!confirmed) {
+      throw new Error("Codex full-auto/YOLO requires explicit confirmation");
+    }
+  }
+
+  return {
+    provider: "codex",
+    command,
+    args: fullAutoArgs,
+  };
+}
+
+async function askWithDefault(
+  input: WizardQuestioner,
+  stdout: (line: string) => void,
+  label: string,
+  defaultValue: string,
+): Promise<string> {
+  stdout(`${label} [${defaultValue}]`);
+  const answer = (await input.question("")).trim();
+  return answer.length === 0 ? defaultValue : answer;
+}
+
+async function askYesNo(
+  input: WizardQuestioner,
+  stdout: (line: string) => void,
+  label: string,
+  defaultValue: boolean,
+): Promise<boolean> {
+  const suffix = defaultValue ? "Y/n" : "y/N";
+  stdout(`${label} [${suffix}]`);
+  const answer = (await input.question("")).trim().toLowerCase();
+  if (answer.length === 0) {
+    return defaultValue;
+  }
+  return answer === "y" || answer === "yes";
+}
+
+async function askExplicitConfirmation(
+  input: WizardQuestioner,
+  stdout: (line: string) => void,
+  label: string,
+): Promise<boolean> {
+  stdout(label);
+  return (await input.question("")).trim() === "yes";
+}
+
+function normalizeRunnerChoice(choice: string): "fake" | "process" {
+  const normalized = choice.trim().toLowerCase();
+  if (normalized === "fake" || normalized.length === 0) {
+    return "fake";
+  }
+  if (["process", "codex", "codex cli"].includes(normalized)) {
+    return "process";
+  }
+  throw new Error("Runner must be fake or process");
+}
+
+function splitArgs(input: string): string[] {
+  return input
+    .split(/\s+/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function addCodexFullAutoArg(args: string[]): string[] {
+  const flag = "--dangerously-bypass-approvals-and-sandbox";
+  if (args.includes(flag)) {
+    return args;
+  }
+  const promptIndex = args.indexOf("{prompt}");
+  if (promptIndex === -1) {
+    return [...args, flag];
+  }
+  return [...args.slice(0, promptIndex), flag, ...args.slice(promptIndex)];
+}
+
+function resolveDocsPath(repoRoot: string, input: string): string {
+  return isAbsolute(input) ? input : resolve(repoRoot, input);
+}
+
+async function executeRunCommand(input: {
+  request: InspectorCliRequest;
+  command: ParsedRunCommand;
+  stdout: (line: string) => void;
+  workspaces: NodeRunWorkspaceStore | NodeRunDataWorkspaceStore;
+  eventSink: InspectionEventSink;
+}): Promise<{ workspace: RunWorkspace; docsPath: string }> {
+  const { request, command, stdout } = input;
+  await assertDirectory(command.repoPath, "Repository path");
+
+  const objective = appendTargetContext(command.objective, command.targetContext);
+  const repoRoot = resolve(command.repoPath);
+  const repositoryReader = new NodeRepositoryReader(repoRoot);
+  const repositoryEntries = await repositoryReader.listEntries();
+  const processRunner = request.processRunner ?? new NodeProcessRunner();
+  const docsPath = command.publicDocsDirectory ?? `${repoRoot}/docs/inspector`;
+  const config: RunConfig = {
+    target: {
+      name: basename(repoRoot),
+      root: repoRoot,
+    },
+    outputDirectory: resolve(command.outPath),
+    agentRoles: ["documentation"],
+    validationCommands: [],
+    verbose: command.verbose,
+    ...(command.targetContext === undefined
+      ? {}
+      : { targetContext: command.targetContext }),
+    ...(command.agents === undefined ? {} : { agents: command.agents }),
+    ...(command.parallelism === undefined
+      ? {}
+      : { parallelism: command.parallelism }),
+    ...(command.maxRetries === undefined ? {} : { maxRetries: command.maxRetries }),
+    runQualityCommands: command.runQualityCommands,
+    ...(command.publicDocsDirectory === undefined
+      ? {}
+      : { publicDocsDirectory: command.publicDocsDirectory }),
+    ...(command.runner === undefined ? {} : { runner: command.runner }),
+  };
+
+  printProgress(stdout, command.verbose, `Inspection started: ${config.target.name}`);
+  const result = await runScoutArchitectureInspection({
+    config,
+    objective,
+    clock: request.clock ?? systemClock,
+    runner:
+      request.runner ??
+      (await createRunnerFromConfig(command.runner, repositoryReader, repositoryEntries)),
+    workspaces: input.workspaces,
+    repositoryReader,
+    repositoryIndexWriter: new NodeRepositoryIndexWriter(),
+    repositoryIndexContext: new NodeRepositoryIndexPromptContextReader(),
+    memory: (workspace) => new NodeSwarmMemoryStore(workspace),
+    promptTemplates: new NodePromptTemplateReader(promptRoot),
+    promptArtifacts: new NodePromptArtifactWriter(),
+    statusArtifacts: new NodeAgentStatusArtifactWriter(),
+    outputArtifacts: new NodeAgentOutputArtifactWriter(),
+    validationReports: new NodeValidationReportWriter(),
+    evidenceReports: new NodeEvidenceValidationReportWriter(),
+    qaArtifacts: new NodeQaArtifactWriter(),
+    qualityCommandReports: new NodeQualityCommandReportWriter(),
+    finalDocs: new NodeSplitCaseStudyDocumentWriter(
+      new NodeCaseStudyDocumentWriter(),
+      new NodePublicCaseStudyDocumentWriter(repoRoot, command.publicDocsDirectory),
+    ),
+    ragCards: new NodeRagKnowledgeCardWriter(),
+    processRunner,
+    validators: await createSchemaContractValidators(),
+    schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
+    events: input.eventSink,
+    progress: (message) => printProgress(stdout, command.verbose, message),
+  });
+
+  return { workspace: result.workspace, docsPath };
 }
 
 const runtimeStageIds = [
@@ -894,6 +1162,48 @@ function createCliEventSink(input: {
       }
     },
   };
+}
+
+function createWizardEventSink(input: {
+  stdout: (line: string) => void;
+  external?: InspectionEventSink;
+}): InspectionEventSink {
+  return {
+    async emit(event) {
+      await input.external?.emit(event);
+      const line = renderWizardInspectionEvent(event);
+      if (line !== undefined) {
+        input.stdout(line);
+      }
+    },
+  };
+}
+
+function renderWizardInspectionEvent(event: InspectionEvent): string | undefined {
+  switch (event.type) {
+    case "stage.started":
+      return `Stage: ${event.label}`;
+    case "agent.started":
+      return `Current (${event.agentId}): ${event.task}`;
+    case "agent.output.received":
+      return `Output received: ${event.agentId}`;
+    case "agent.schema.passed":
+      return `Schema passed: ${event.agentId}`;
+    case "agent.evidence.passed":
+      return `Evidence passed: ${event.agentId}`;
+    case "agent.failed":
+      return `Agent failed: ${event.agentId} - ${event.reason}`;
+    case "qa.completed":
+      return `QA: ${event.approved} approved, ${event.rejected} rejected, ${event.issues} issue(s)`;
+    case "docs.written":
+      return `Final docs: ${event.path}`;
+    case "run.completed":
+      return `Internal data: ${event.dataPath}`;
+    case "run.started":
+      return `Internal data: ${event.dataPath}`;
+    default:
+      return undefined;
+  }
 }
 
 function renderInspectionEvent(event: InspectionEvent): string | undefined {

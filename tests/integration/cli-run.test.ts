@@ -7,6 +7,7 @@ import {
   stat,
   readdir,
 } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chdir, cwd, execPath } from "node:process";
@@ -649,6 +650,248 @@ test("CLI run creates a run workspace for a valid command", async () => {
       "utf8",
     ),
     ".\nREADME.md\npackage.json\n",
+  );
+});
+
+test("CLI with no args enters interactive wizard", async () => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [],
+    stdin: Readable.from(["n\n"]),
+    stdout: (line) => stdout.push(line),
+    stderr: (line) => stderr.push(line),
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(stderr.length, 0);
+  assert.match(stdout.join("\n"), /Interactive Inspector Wizard/);
+  assert.match(stdout.join("\n"), /Repository path \[.\]/);
+});
+
+test("CLI help does not enter interactive wizard", async () => {
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: ["--help"],
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(stdout.join("\n"), /Usage: inspector <command>/);
+  assert.doesNotMatch(stdout.join("\n"), /Interactive Inspector Wizard/);
+});
+
+test("CLI run, status, and resume route to existing commands instead of wizard", async () => {
+  const fixture = await createFixture();
+  const statusRunDirectory = join(fixture.outPath, "status-run");
+  await mkdir(statusRunDirectory, { recursive: true });
+
+  const runStdout: string[] = [];
+  const runResult = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: (line) => runStdout.push(line),
+  });
+  assert.equal(runResult.exitCode, 0);
+  assert.doesNotMatch(runStdout.join("\n"), /Interactive Inspector Wizard/);
+
+  const statusStdout: string[] = [];
+  const statusResult = await runInspectorCli({
+    argv: ["status", statusRunDirectory],
+    stdout: (line) => statusStdout.push(line),
+  });
+  assert.equal(statusResult.exitCode, 0);
+  assert.doesNotMatch(statusStdout.join("\n"), /Interactive Inspector Wizard/);
+
+  const resumeStdout: string[] = [];
+  const resumeResult = await runInspectorCli({
+    argv: ["resume", runResult.workspace?.root ?? ""],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: (line) => resumeStdout.push(line),
+    stderr: () => undefined,
+  });
+  assert.equal(resumeResult.exitCode, 0);
+  assert.doesNotMatch(resumeStdout.join("\n"), /Interactive Inspector Wizard/);
+});
+
+test("interactive wizard defaults repository and docs paths", async () => {
+  const fixture = await createFixture();
+  const previousCwd = cwd();
+  const stdout: string[] = [];
+
+  try {
+    chdir(fixture.repoPath);
+    const result = await runInspectorCli({
+      argv: [],
+      stdin: Readable.from([
+        "\n",
+        "\n",
+        `${join(fixture.tempDirectory, "user-data")}\n`,
+        "\n",
+        "\n",
+        "y\n",
+      ]),
+      clock: fixedClock,
+      runner: successfulRunner(),
+      stdout: (line) => stdout.push(line),
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.match(stdout.join("\n"), /Repository path \[.\]/);
+    assert.match(stdout.join("\n"), /Public docs output path \[.\/docs\/inspector\]/);
+    assert.equal(
+      await stat(join(fixture.repoPath, "docs", "inspector")).then((metadata) =>
+        metadata.isDirectory(),
+      ),
+      true,
+    );
+  } finally {
+    chdir(previousCwd);
+  }
+});
+
+test("interactive wizard refuses Codex YOLO without explicit confirmation", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [],
+    stdin: Readable.from([
+      `${fixture.repoPath}\n`,
+      `${join(fixture.repoPath, "docs", "inspector")}\n`,
+      `${join(fixture.tempDirectory, "user-data")}\n`,
+      "process\n",
+      "codex\n",
+      "exec {prompt}\n",
+      "y\n",
+      "no\n",
+    ]),
+    stdout: (line) => stdout.push(line),
+    stderr: (line) => stderr.push(line),
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stdout.join("\n"),
+    /This grants Codex permission to run commands in this trusted local repository/,
+  );
+  assert.match(stderr.join("\n"), /Codex full-auto\/YOLO requires explicit confirmation/);
+});
+
+test("interactive wizard refuses quality command execution without explicit confirmation", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [],
+    stdin: Readable.from([
+      `${fixture.repoPath}\n`,
+      `${join(fixture.repoPath, "docs", "inspector")}\n`,
+      `${join(fixture.tempDirectory, "user-data")}\n`,
+      "\n",
+      "y\n",
+      "no\n",
+    ]),
+    stdout: (line) => stdout.push(line),
+    stderr: (line) => stderr.push(line),
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stdout.join("\n"),
+    /Detected package scripts can execute arbitrary project code/,
+  );
+  assert.match(
+    stderr.join("\n"),
+    /Quality command execution requires explicit confirmation/,
+  );
+});
+
+test("interactive wizard runs fake runner with scripted input", async () => {
+  const fixture = await createFixture();
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [],
+    stdin: Readable.from([
+      `${fixture.repoPath}\n`,
+      `${join(fixture.repoPath, "custom-docs")}\n`,
+      `${join(fixture.tempDirectory, "user-data")}\n`,
+      "\n",
+      "\n",
+      "y\n",
+    ]),
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(stdout.join("\n"), /Specialist Agents/);
+  assert.match(stdout.join("\n"), /Current \(scout\)/);
+  assert.match(stdout.join("\n"), /Schema passed: scout/);
+  assert.match(stdout.join("\n"), /Evidence passed: scout/);
+  assert.match(stdout.join("\n"), /QA: 6 approved, 0 rejected, 0 issue\(s\)/);
+  assert.match(stdout.join("\n"), /Final docs:/);
+  assert.match(stdout.join("\n"), /Internal data:/);
+});
+
+test("interactive wizard writes public docs to docs output and internal data to user data path", async () => {
+  const fixture = await createFixture();
+  const docsPath = join(fixture.tempDirectory, "published-docs");
+  const userDataPath = join(fixture.tempDirectory, "inspector-data");
+
+  const result = await runInspectorCli({
+    argv: [],
+    stdin: Readable.from([
+      `${fixture.repoPath}\n`,
+      `${docsPath}\n`,
+      `${userDataPath}\n`,
+      "\n",
+      "\n",
+      "y\n",
+    ]),
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(
+    await stat(join(docsPath, "00-executive-summary.md")).then((metadata) =>
+      metadata.isFile(),
+    ),
+    true,
+  );
+  assert.equal(
+    result.workspace?.root,
+    join(userDataPath, "runs", "2026-06-20T01-02-03-004Z_target-repo"),
+  );
+  assert.equal(
+    await stat(
+      join(
+        userDataPath,
+        "runs",
+        "2026-06-20T01-02-03-004Z_target-repo",
+        "final",
+        "docs",
+        "00-executive-summary.md",
+      ),
+    ).then((metadata) => metadata.isFile()),
+    true,
   );
 });
 
