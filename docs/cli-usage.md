@@ -1,7 +1,7 @@
 # CLI Usage
 
-The CLI entrypoint is `inspector` after `npm run build`. During development, use
-`npm run dev --`.
+The CLI binary is `inspector` after `npm run build`. The npm package name is
+`codebase-inspector`. During development, use `npm run dev --`.
 
 Show command help:
 
@@ -13,7 +13,7 @@ node dist/main.js --help
 Start the interactive release wizard:
 
 ```bash
-npx inspector
+npx codebase-inspector
 node dist/main.js
 ```
 

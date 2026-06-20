@@ -1,4 +1,4 @@
-# RFC: Interactive `npx inspector` Release UX
+# RFC: Interactive `npx codebase-inspector` Release UX
 
 ## Status
 
@@ -12,7 +12,7 @@ appropriate for automation, tests, and explicit configuration, but it is not
 the release experience expected from:
 
 ```bash
-npx inspector
+npx codebase-inspector
 ```
 
 The production release should let a user run Inspector from inside any codebase
@@ -29,7 +29,7 @@ by default, or normalize unsafe runner and quality-command behavior.
 
 ## Goals
 
-- Make `npx inspector` an interactive production entrypoint.
+- Make `npx codebase-inspector` an interactive production entrypoint.
 - Let users inspect the current directory by default with repository path `.`.
 - Write public development docs to `./docs/inspector` by default.
 - Store internal run data in the OS user data directory by default.
@@ -56,9 +56,9 @@ by default, or normalize unsafe runner and quality-command behavior.
 
 ## User Experience
 
-### Interactive `npx inspector`
+### Interactive `npx codebase-inspector`
 
-Running `npx inspector` with no subcommand starts an interactive setup flow.
+Running `npx codebase-inspector` with no subcommand starts an interactive setup flow.
 The user can run it from inside any codebase directory.
 
 The flow asks, in order:
@@ -109,7 +109,7 @@ path, objective, output paths, runner configuration, debug behavior, and trusted
 quality-command execution.
 
 `inspector run` may later accept the same output model as interactive
-`npx inspector`, but it must remain predictable for scripts.
+`npx codebase-inspector`, but it must remain predictable for scripts.
 
 ### `inspector status`
 
@@ -125,7 +125,7 @@ agent stages without needing raw logs or public docs.
 `inspector resume <run-dir>` remains a non-interactive recovery command for an
 existing internal run workspace.
 
-Interactive `npx inspector` may offer resume as a future convenience when a
+Interactive `npx codebase-inspector` may offer resume as a future convenience when a
 last-run pointer exists, but resume semantics stay application-owned:
 completed or approved agents are reused, failed or pending stages continue in
 place, and corrupted state fails safely.
@@ -151,7 +151,7 @@ doctor flag is added for that purpose.
 
 ### Public docs directory
 
-The default public docs directory for interactive `npx inspector` is:
+The default public docs directory for interactive `npx codebase-inspector` is:
 
 ```text
 ./docs/inspector
@@ -373,7 +373,7 @@ the release behavior must make accidental consent unlikely.
 
 Quality commands remain disabled unless explicitly trusted.
 
-Interactive `npx inspector` must ask whether trusted quality commands may
+Interactive `npx codebase-inspector` must ask whether trusted quality commands may
 execute. The default answer is no. If enabled, the existing validation command
 policy still applies: only known safe test, typecheck, lint, build, and related
 commands may run, shell syntax remains blocked, and blocked commands are
@@ -400,7 +400,7 @@ private operational data.
 
 ### User data directory behavior by OS
 
-Interactive `npx inspector` stores internal run data under an Inspector-specific
+Interactive `npx codebase-inspector` stores internal run data under an Inspector-specific
 directory in the OS user data location by default:
 
 - macOS: `~/Library/Application Support/inspector`
@@ -472,7 +472,7 @@ shortcuts.
 
 Implementation should add tests that verify:
 
-- `npx inspector` with no subcommand enters the interactive path.
+- `npx codebase-inspector` with no subcommand enters the interactive path.
 - The interactive defaults are repository `.`, public docs `./docs/inspector`,
   internal storage under the OS user data directory, fake runner, quality
   commands disabled, and raw output hidden.
@@ -512,7 +512,7 @@ Implementation should add tests that verify:
 3. Add a user data directory adapter with OS-specific defaults.
 4. Add tests for the interactive configuration flow using fake prompts or a
    test renderer; keep application orchestration outside Ink components.
-5. Add the interactive `npx inspector` adapter with the fake runner and quality
+5. Add the interactive `npx codebase-inspector` adapter with the fake runner and quality
    commands disabled by default.
 6. Add Codex runner selection and explicit safety confirmations.
 7. Add curated TUI lifecycle rendering from structured events.

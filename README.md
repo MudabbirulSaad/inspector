@@ -73,7 +73,7 @@ Run the local fake-runner pipeline:
 npm run dev -- run ./tests/fixtures/tiny-node-app --objective ./objective.md --out ./.inspector-runs --verbose
 ```
 
-After building, `node dist/main.js` or package-style `npx inspector` opens the
+After building, `node dist/main.js` or package-style `npx codebase-inspector` opens the
 interactive wizard. The wizard defaults to the current directory, publishes
 Markdown to `./docs/inspector`, stores internal run data under the OS Inspector
 user data directory, and uses the fake runner unless a process-backed Codex
@@ -86,12 +86,23 @@ npm run dev -- status ./.inspector-runs/<run-directory>
 npm run dev -- resume ./.inspector-runs/<run-directory>
 ```
 
+The npm package name is `codebase-inspector`. The package remains private while
+local release behavior is verified with `npm pack`; that tarball can be
+installed in a temporary project and exercised with the same command shape as
+`npx codebase-inspector`. The installed binary is still named `inspector`.
+
 For package-style usage after building:
 
 ```bash
 node dist/main.js
 node dist/main.js run <repo-path> --objective <objective-file> --out <output-path>
+npx codebase-inspector --help
+npx codebase-inspector run <repo-path> --objective <objective-file> --out <output-path>
 ```
+
+Use the deterministic fake runner for offline packaging and workflow smoke
+tests. Use a process-backed runner only when you intend to call a real local
+Codex or compatible agent command.
 
 ## Documentation
 
