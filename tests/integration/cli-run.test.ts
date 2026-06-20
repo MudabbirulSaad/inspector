@@ -526,6 +526,13 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       .map((line) => JSON.parse(line) as unknown),
     [scoutFinding, architectureFinding, patternMinerFinding],
   );
+  assert.deepEqual(
+    (await readFile(join(workspaceRoot, "memory", "verified_findings.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as unknown),
+    [scoutFinding, architectureFinding, patternMinerFinding],
+  );
   assert.match(
     await readFile(
       join(workspaceRoot, "validation", "scout", "attempt-1", "report.json"),
@@ -603,6 +610,16 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       "utf8",
     ),
     /"valid": true/,
+  );
+  assert.equal(
+    JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
+      .readinessScore,
+    100,
+  );
+  assert.equal(
+    JSON.parse(await readFile(join(workspaceRoot, "qa", "results.json"), "utf8"))
+      .length,
+    3,
   );
 });
 

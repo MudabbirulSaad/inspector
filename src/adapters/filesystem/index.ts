@@ -8,6 +8,7 @@ import type {
   EvidenceValidationReportWriter,
   PromptArtifactWriter,
   PromptTemplateReader,
+  QaArtifactWriter,
   RepositoryEntry,
   RepositoryIndexPromptContextReader,
   RepositoryIndexWriter,
@@ -271,6 +272,53 @@ export class NodeEvidenceValidationReportWriter
 
     await mkdir(directory, { recursive: true });
     await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+export class NodeQaArtifactWriter implements QaArtifactWriter {
+  async writeQaResults(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }> {
+    return this.writeQaArtifact(request.workspace, "results.json", request.content);
+  }
+
+  async writeQaIssues(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }> {
+    return this.writeQaArtifact(request.workspace, "issues.json", request.content);
+  }
+
+  async writeRevisionRequests(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }> {
+    return this.writeQaArtifact(
+      request.workspace,
+      "revision_requests.json",
+      request.content,
+    );
+  }
+
+  async writeReadiness(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }> {
+    return this.writeQaArtifact(request.workspace, "readiness.json", request.content);
+  }
+
+  private async writeQaArtifact(
+    workspace: RunWorkspace,
+    filename: string,
+    content: string,
+  ): Promise<{ path: string }> {
+    const path = join(workspace.folders.qa, filename);
+
+    await mkdir(workspace.folders.qa, { recursive: true });
+    await writeFile(path, content);
 
     return { path };
   }

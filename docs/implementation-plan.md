@@ -981,3 +981,51 @@ git status
 ```bash
 feat(agents): mine reusable architecture patterns
 ```
+
+### Milestone 22: QA Verifier and Revision Requests
+
+#### Goal
+
+Integrate deterministic QA verification after candidate finding validation.
+
+#### Tasks
+
+- Added a QA verification application use case that consumes candidate findings,
+  schema reports, evidence reports, agent reports, and memory context.
+- QA now separates approved and rejected findings, rejects unsupported claims,
+  identifies direct textual contradictions between candidate findings, and
+  avoids inventing architecture claims beyond submitted finding text and
+  validation evidence.
+- Failed QA now creates QA issues, QA results, owner-agent revision requests,
+  and required corrections.
+- Added a deterministic readiness score based on approved findings divided by
+  total candidate findings.
+- Added a `QaArtifactWriter` port and filesystem adapter that writes
+  `qa/results.json`, `qa/issues.json`, `qa/revision_requests.json`, and
+  `qa/readiness.json` under the run workspace.
+- Wired QA verification into the current Scout/Architecture/Pattern Miner
+  runtime use case and appended approved findings, rejected findings, and QA
+  issues to run memory.
+
+#### TDD
+
+Added integration tests for unsupported finding rejection and QA issue creation,
+owner-agent routing, approved/rejected separation, revision request writing,
+deterministic readiness scoring, contradiction rejection, filesystem QA
+artifacts, and CLI runtime QA memory/artifact output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(qa): verify findings and produce revision requests
+```

@@ -15,6 +15,7 @@ import type {
   EvidenceValidationReportWriter,
   PromptArtifactWriter,
   PromptTemplateReader,
+  QaArtifactWriter,
   RepositoryEntry,
   RepositoryIndexPromptContextReader,
   RepositoryIndexWriter,
@@ -25,7 +26,13 @@ import type {
   ValidationReportWriter,
 } from "../ports/index.js";
 import type { SchemaContractValidators } from "../validation/index.js";
-import { appendSwarmBlackboardSnapshot, appendSwarmFinding } from "./append-swarm-memory.js";
+import {
+  appendRejectedSwarmFinding,
+  appendSwarmBlackboardSnapshot,
+  appendSwarmFinding,
+  appendSwarmQaIssue,
+  appendVerifiedSwarmFinding,
+} from "./append-swarm-memory.js";
 import { buildAgentPrompt } from "./build-agent-prompt.js";
 import { createInspectionRunWorkspace } from "./create-inspection-run-workspace.js";
 import { executeAgentRun } from "./execute-agent-run.js";
@@ -36,6 +43,11 @@ import {
   repositoryFilesForEvidence,
   validateEvidenceReferences,
 } from "./validate-evidence-references.js";
+import {
+  type QaEvidenceReport,
+  type QaSchemaReport,
+  verifyFindingsWithQa,
+} from "./verify-findings-with-qa.js";
 
 export interface RunScoutArchitectureInspectionInput {
   config: RunConfig;
@@ -52,6 +64,7 @@ export interface RunScoutArchitectureInspectionInput {
   outputArtifacts: AgentOutputArtifactWriter;
   validationReports: ValidationReportWriter;
   evidenceReports: EvidenceValidationReportWriter;
+  qaArtifacts: QaArtifactWriter;
   validators: SchemaContractValidators;
   schemaReader: AgentOutputSchemaReader;
   progress?: (message: string) => void;
@@ -96,6 +109,9 @@ export async function runScoutArchitectureInspection(
   input.progress?.("Initializing memory");
   const runMemory = input.memory(workspace);
   const memorySnapshot = renderInitialMemorySnapshot(input.objective);
+  const candidateFindings: Finding[] = [];
+  const schemaReports: QaSchemaReport[] = [];
+  const evidenceReports: QaEvidenceReport[] = [];
   await appendSwarmBlackboardSnapshot({
     title: "Run initialized",
     body: `Objective: ${input.objective.trim()}`,
@@ -118,6 +134,7 @@ export async function runScoutArchitectureInspection(
       workspace,
     );
   }
+  schemaReports.push({ agentId: "scout", valid: true, errors: [] });
 
   const scoutOutput = scoutSchemaResult.value as ScoutOutput;
   const scoutEvidence = scoutEvidenceFindings(scoutOutput);
@@ -138,8 +155,10 @@ export async function runScoutArchitectureInspection(
       workspace,
     );
   }
+  evidenceReports.push({ agentId: "scout", valid: true, errors: [] });
 
   for (const finding of scoutOutput.findings) {
+    candidateFindings.push(finding);
     await appendSwarmFinding({
       finding,
       memory: runMemory,
@@ -163,6 +182,7 @@ export async function runScoutArchitectureInspection(
       workspace,
     );
   }
+  schemaReports.push({ agentId: "architecture", valid: true, errors: [] });
 
   const architectureOutput =
     architectureSchemaResult.value as ArchitectureOutput;
@@ -183,8 +203,10 @@ export async function runScoutArchitectureInspection(
       workspace,
     );
   }
+  evidenceReports.push({ agentId: "architecture", valid: true, errors: [] });
 
   for (const finding of architectureOutput.findings) {
+    candidateFindings.push(finding);
     await appendSwarmFinding({
       finding,
       memory: runMemory,
@@ -208,6 +230,7 @@ export async function runScoutArchitectureInspection(
       workspace,
     );
   }
+  schemaReports.push({ agentId: "pattern_miner", valid: true, errors: [] });
 
   const patternMinerOutput =
     patternMinerSchemaResult.value as PatternMinerOutput;
@@ -228,12 +251,48 @@ export async function runScoutArchitectureInspection(
       workspace,
     );
   }
+  evidenceReports.push({ agentId: "pattern_miner", valid: true, errors: [] });
 
   for (const finding of patternMinerOutput.findings) {
+    candidateFindings.push(finding);
     await appendSwarmFinding({
       finding,
       memory: runMemory,
       validator: input.validators.finding,
+    });
+  }
+
+  input.progress?.("Running QA verification");
+  const qa = await verifyFindingsWithQa({
+    candidateFindings,
+    schemaReports,
+    evidenceReports,
+    agentReports: [],
+    memory: memorySnapshot,
+    now: input.clock.now(),
+    workspace,
+    artifacts: input.qaArtifacts,
+  });
+
+  for (const finding of qa.approvedFindings) {
+    await appendVerifiedSwarmFinding({
+      finding,
+      memory: runMemory,
+      validator: input.validators.finding,
+    });
+  }
+  for (const finding of qa.rejectedFindings) {
+    await appendRejectedSwarmFinding({
+      finding,
+      memory: runMemory,
+      validator: input.validators.finding,
+    });
+  }
+  for (const issue of qa.qaIssues) {
+    await appendSwarmQaIssue({
+      issue,
+      memory: runMemory,
+      validator: input.validators["qa-issue"],
     });
   }
 

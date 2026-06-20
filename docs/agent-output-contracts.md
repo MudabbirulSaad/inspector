@@ -42,13 +42,15 @@ candidate findings for downstream QA and reporting.
 
 ## QA Result
 
-`qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required.
+`qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required. The runtime QA verifier also writes `qa/readiness.json` with a deterministic readiness score derived from approved findings divided by total candidate findings.
 
 ## QA Issue and Revision Request
 
 `qa-issue.schema.json` describes an individual failed or review-needed QA check.
 `revision-request.schema.json` records how a failed QA result is routed back to
-the responsible follow-up agent, including required corrections.
+the responsible follow-up agent, including required corrections. Unsupported
+claims and direct contradictions are rejected instead of promoted into final
+outputs.
 
 ## Knowledge Card
 

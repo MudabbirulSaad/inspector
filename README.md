@@ -2,7 +2,7 @@
 
 `inspector` is a Node.js and TypeScript CLI for AI-assisted codebase inspection. It will coordinate specialist inspection agents, validate evidence-backed findings, and produce documentation artifacts that future coding agents can reuse.
 
-The current runtime slice supports Scout, Architecture, and Pattern Miner inspection runs. It creates a run workspace, indexes a repository, initializes memory, builds audited prompts from repository index context, runs Scout first, feeds validated Scout output into Architecture, feeds Scout plus Architecture output into Pattern Miner, validates each agent's structured output and evidence, and appends only candidate findings to memory.
+The current runtime slice supports Scout, Architecture, Pattern Miner, and deterministic QA verification. It creates a run workspace, indexes a repository, initializes memory, builds audited prompts from repository index context, runs Scout first, feeds validated Scout output into Architecture, feeds Scout plus Architecture output into Pattern Miner, validates each agent's structured output and evidence, appends candidate findings to memory, and then separates approved and rejected findings with QA results, QA issues, revision requests, and a readiness score.
 
 The current standalone CLI runtime uses a deterministic fake runner by default. Real process-backed runner infrastructure exists, but CLI configuration for real Codex execution is not exposed yet.
 

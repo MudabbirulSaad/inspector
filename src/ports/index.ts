@@ -125,6 +125,25 @@ export interface AgentOutputArtifactWriter {
   }): Promise<{ path: string }>;
 }
 
+export interface QaArtifactWriter {
+  writeQaResults(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }>;
+  writeQaIssues(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }>;
+  writeRevisionRequests(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }>;
+  writeReadiness(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }>;
+}
+
 export interface AgentOutputSchemaReader {
   readAgentOutputSchema(contract: string): Promise<unknown>;
 }

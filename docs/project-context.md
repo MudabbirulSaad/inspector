@@ -54,16 +54,21 @@ violations, and writes validation reports under the run workspace for QA and
 retry routing. Evidence validation now deterministically checks cited repository
 paths, positive line ranges, high-confidence finding evidence, QA finding
 references, and knowledge-card references to approved findings before semantic
-QA, while loading line counts only for cited repository files. The runtime CLI
-slice now parses `inspector run`, validates repository and objective paths,
-wires concrete adapters, prints progress, and calls a Scout/Architecture/Pattern
-Miner application use case. That use case creates a run workspace, indexes the
-repository, initializes memory, builds auditable Scout, Architecture, and
-Pattern Miner prompts, runs Scout before Architecture before Pattern Miner
-through the runner port, validates structured schemas and cited evidence, writes
-artifacts through ports, and appends only candidate findings from schema-valid
-and evidence-valid outputs. Full scheduler-driven multi-agent orchestration is
-still pending.
+QA, while loading line counts only for cited repository files. QA verification
+now reviews candidate findings against schema and evidence reports, rejects
+unsupported or contradictory findings, routes failures to the owner agent with
+revision requests, writes QA artifacts, appends approved/rejected findings to
+run memory, and computes a deterministic readiness score. The runtime CLI slice
+now parses `inspector run`, validates repository and objective paths, wires
+concrete adapters, prints progress, and calls a Scout/Architecture/Pattern
+Miner plus QA application use case. That use case creates a run workspace,
+indexes the repository, initializes memory, builds auditable Scout,
+Architecture, and Pattern Miner prompts, runs Scout before Architecture before
+Pattern Miner through the runner port, validates structured schemas and cited
+evidence, writes artifacts through ports, appends candidate findings from
+schema-valid and evidence-valid outputs, and then produces QA results, QA
+issues, revision requests, approved findings, rejected findings, and readiness
+metadata. Full scheduler-driven multi-agent orchestration is still pending.
 
 ## Non-Goals
 

@@ -101,18 +101,20 @@ Adapter responsibilities include:
 - CLI adapters parse arguments, handle user-visible errors, and call application
   use cases.
 - The CLI `run` adapter validates local repository and objective paths, wires
-  concrete filesystem, memory, validation, prompt, schema, and runner adapters,
-  prints user-visible progress, and calls the Scout/Architecture/Pattern Miner
-  application use case.
+  concrete filesystem, memory, validation, prompt, schema, QA artifact, and
+  runner adapters, prints user-visible progress, and calls the
+  Scout/Architecture/Pattern Miner plus QA application use case.
 - The current Scout/Architecture/Pattern Miner application use case creates the
   run workspace, indexes the repository, initializes memory, builds auditable
   prompts, runs Scout before Architecture before Pattern Miner, validates
   structured schema and cited evidence, writes runtime artifacts through ports,
-  and appends only candidate findings from schema-valid and evidence-valid
-  outputs. Shared application step logic handles prompt construction, runner
-  execution, output persistence, and schema validation for these agents. It
-  remains a linear early runtime slice until the full scheduler-driven
-  orchestration flow is wired.
+  appends candidate findings from schema-valid and evidence-valid outputs, then
+  runs deterministic QA verification to produce approved findings, rejected
+  findings, QA results, QA issues, revision requests, and readiness metadata.
+  Shared application step logic handles prompt construction, runner execution,
+  output persistence, and schema validation for these agents. It remains a
+  linear early runtime slice until the full scheduler-driven orchestration flow
+  is wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
@@ -133,6 +135,9 @@ Adapter responsibilities include:
   into each agent attempt folder.
 - Validation report adapters write deterministic validation reports for each
   agent attempt into the run workspace.
+- QA artifact adapters write deterministic `qa/results.json`, `qa/issues.json`,
+  `qa/revision_requests.json`, and `qa/readiness.json` artifacts into the run
+  workspace.
 - Memory adapters persist local swarm events without exposing raw prompts,
   transcripts, secrets, or private state in public docs. Run memory is
   append-only and lives under the run workspace `memory/` folder.
@@ -160,6 +165,8 @@ Expected ports include:
 - `PromptArtifactWriter` for saving exact run-specific agent prompts.
 - `AgentStatusArtifactWriter` for saving serialized lifecycle status snapshots.
 - `ValidationReportWriter` for saving parse and schema validation reports.
+- `QaArtifactWriter` for saving deterministic QA result, issue, revision
+  request, and readiness artifacts.
 - `EvidenceValidator` for deterministic file, line-range, and cross-artifact
   evidence-reference checks before semantic QA.
 - `ArtifactValidator` for schema-backed runtime artifact checks used before
