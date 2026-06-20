@@ -1,4 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { homedir, platform as currentPlatform } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type {
@@ -17,11 +18,13 @@ import type {
   RepositoryIndexPromptContextReader,
   RepositoryIndexWriter,
   RepositoryReader,
+  RunDataWorkspaceStore,
   RunWorkspace,
   RunWorkspaceRequest,
   RunWorkspaceStore,
   SwarmMemoryStore,
   SwarmMemoryStream,
+  UserDataDirectoryProvider,
   ValidationReportWriter,
 } from "../../ports/index.js";
 
@@ -70,6 +73,91 @@ export class NodeRunWorkspaceStore implements RunWorkspaceStore {
         { cause: error },
       );
     }
+  }
+}
+
+export class NodeUserDataDirectoryProvider
+  implements UserDataDirectoryProvider
+{
+  constructor(
+    private readonly options: {
+      platform?: NodeJS.Platform;
+      env?: Record<string, string | undefined>;
+      homeDirectory?: string;
+    } = {},
+  ) {}
+
+  async getInspectorDataRoot(): Promise<string> {
+    const platform = this.options.platform ?? currentPlatform();
+    const env = this.options.env ?? process.env;
+    const homeDirectory = this.options.homeDirectory ?? homedir();
+
+    if (platform === "win32") {
+      return join(env.APPDATA ?? join(homeDirectory, "AppData", "Roaming"), "inspector");
+    }
+
+    if (platform === "darwin") {
+      return join(homeDirectory, "Library", "Application Support", "inspector");
+    }
+
+    return join(env.XDG_DATA_HOME ?? join(homeDirectory, ".local", "share"), "inspector");
+  }
+}
+
+export class NodeRunDataWorkspaceStore
+  implements RunDataWorkspaceStore, RunWorkspaceStore
+{
+  constructor(
+    private readonly options:
+      | { dataRoot: string }
+      | { provider: UserDataDirectoryProvider },
+  ) {}
+
+  async create(request: RunWorkspaceRequest): Promise<RunWorkspace> {
+    return this.createRunDataWorkspace(request);
+  }
+
+  async createRunDataWorkspace(
+    request: RunWorkspaceRequest,
+  ): Promise<RunWorkspace> {
+    const dataRoot = await this.getDataRoot();
+    const workspace = await new NodeRunWorkspaceStore().create({
+      ...request,
+      outputDirectory: join(dataRoot, "runs"),
+    });
+    await this.writeLastRunPointer(workspace.root);
+    return workspace;
+  }
+
+  async getLastRunPointer(): Promise<string | undefined> {
+    try {
+      const pointer = (await readFile(await this.lastRunPointerPath(), "utf8")).trim();
+      return pointer.length === 0 ? undefined : pointer;
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return undefined;
+      }
+
+      throw error;
+    }
+  }
+
+  async writeLastRunPointer(path: string): Promise<void> {
+    const pointerPath = await this.lastRunPointerPath();
+    await mkdir(await this.getDataRoot(), { recursive: true });
+    await writeFile(pointerPath, `${path}\n`);
+  }
+
+  private async lastRunPointerPath(): Promise<string> {
+    return join(await this.getDataRoot(), "last-run");
+  }
+
+  private async getDataRoot(): Promise<string> {
+    if ("dataRoot" in this.options) {
+      return this.options.dataRoot;
+    }
+
+    return this.options.provider.getInspectorDataRoot();
   }
 }
 
@@ -378,6 +466,46 @@ export class NodeCaseStudyDocumentWriter implements CaseStudyDocumentWriter {
     await writeFile(path, request.content);
 
     return { path };
+  }
+}
+
+export class NodePublicCaseStudyDocumentWriter
+  implements CaseStudyDocumentWriter
+{
+  constructor(private readonly targetRepositoryRoot: string) {}
+
+  async writeCaseStudyDocument(request: {
+    workspace: RunWorkspace;
+    path: string;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(this.targetRepositoryRoot, "docs", "inspector");
+    const path = join(directory, request.path);
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+export class NodeSplitCaseStudyDocumentWriter
+  implements CaseStudyDocumentWriter
+{
+  constructor(
+    private readonly internalWriter: CaseStudyDocumentWriter,
+    private readonly publicWriter: CaseStudyDocumentWriter,
+  ) {}
+
+  async writeCaseStudyDocument(request: {
+    workspace: RunWorkspace;
+    path: string;
+    content: string;
+  }): Promise<{ path: string }> {
+    const internalResult =
+      await this.internalWriter.writeCaseStudyDocument(request);
+    await this.publicWriter.writeCaseStudyDocument(request);
+    return internalResult;
   }
 }
 

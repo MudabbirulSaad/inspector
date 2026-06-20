@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -22,10 +22,11 @@ test("fake-run pipeline inspects tiny checked-in repositories end to end", async
 
   for (const fixtureName of fixtures) {
     await context.test(fixtureName, async () => {
-      const repoPath = join(fixturesRoot, fixtureName);
       const outputDirectory = await mkdtemp(
         join(tmpdir(), `inspector-e2e-${fixtureName}-`),
       );
+      const repoPath = join(outputDirectory, fixtureName);
+      await cp(join(fixturesRoot, fixtureName), repoPath, { recursive: true });
       const objectivePath = join(outputDirectory, "objective.md");
       await writeFile(
         objectivePath,

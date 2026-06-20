@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  writeFile,
+  mkdir,
+  stat,
+  readdir,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chdir, cwd, execPath } from "node:process";
@@ -641,6 +648,90 @@ test("CLI run creates a run workspace for a valid command", async () => {
       "utf8",
     ),
     ".\nREADME.md\npackage.json\n",
+  );
+});
+
+test("CLI run writes public Markdown docs under the target repository", async () => {
+  const fixture = await createFixture();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+
+  const publicDocsDirectory = join(fixture.repoPath, "docs", "inspector");
+  const publicDocs = await readdir(publicDocsDirectory);
+
+  assert.deepEqual(
+    publicDocs.sort(),
+    [
+      "00-executive-summary.md",
+      "01-product-context.md",
+      "02-architecture-map.md",
+      "03-feature-flow-traces.md",
+      "04-pattern-catalog.md",
+      "05-testing-strategy.md",
+      "06-tradeoffs-and-risks.md",
+      "07-adaptation-blueprint.md",
+      "08-implementation-plan.md",
+      "09-verification-report.md",
+    ],
+  );
+  assert.match(
+    await readFile(
+      join(publicDocsDirectory, "00-executive-summary.md"),
+      "utf8",
+    ),
+    /The repository includes a README entrypoint/,
+  );
+});
+
+test("CLI public docs output does not include raw JSON artifacts", async () => {
+  const fixture = await createFixture();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+
+  const publicDocsDirectory = join(fixture.repoPath, "docs", "inspector");
+  const publicDocs = await readdir(publicDocsDirectory, {
+    recursive: true,
+    withFileTypes: true,
+  });
+
+  assert.deepEqual(
+    publicDocs
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((name) => name.endsWith(".json") || name.endsWith(".jsonl")),
+    [],
+  );
+  await assert.rejects(stat(join(publicDocsDirectory, "qa", "results.json")));
+  await assert.rejects(
+    stat(join(publicDocsDirectory, "rag_cards", "patterns.jsonl")),
   );
 });
 
@@ -2552,7 +2643,7 @@ test("CLI run prints professional verbose inspection progress", async () => {
   assert.match(output, /QA issues found: [1-9]/);
   assert.match(output, /Retrying Architecture after QA feedback \(attempt 2\)/);
   assert.match(output, /QA verification passed: 6 approved, 0 rejected/);
-  assert.match(output, /Final output: .*final\/docs/);
+  assert.match(output, /Final output: .*docs\/inspector/);
   assert.match(output, /Inspection run workspace:/);
 
 });

@@ -31,6 +31,12 @@ Required direct arguments:
 - `--out <output-path>`: directory where `.inspector-runs` style workspaces can
   be created.
 
+Successful runs publish user-facing Markdown docs to
+`<repo-path>/docs/inspector/`. Internal artifacts remain in the run workspace
+printed as `Inspection run workspace:`. The public docs directory intentionally
+contains Markdown only; raw prompts, JSON validation reports, QA artifacts,
+memory streams, and RAG JSONL stay in the internal workspace.
+
 Useful flags:
 
 - `--verbose`: prints run start, indexing, agent lifecycle, validation, retry,
@@ -68,7 +74,8 @@ npm run dev -- resume <run-dir>
 `resume` reconstructs an existing run from `config.json`, memory, repository
 index, quality command report, lifecycle statuses, and output artifacts. It
 reuses completed specialist outputs and continues failed or pending stages in
-place.
+place. When final docs are regenerated, `resume` also republishes Markdown to
+`<repo-path>/docs/inspector/`.
 
 Resume fails safely when state is ambiguous, such as a completed stage without
 its output artifact or an invalid lifecycle status.

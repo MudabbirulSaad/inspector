@@ -24,7 +24,8 @@ runner when you want to invoke a local Codex CLI command.
 
 ## What It Does
 
-- Creates an auditable run workspace under the configured output directory.
+- Creates an auditable internal run workspace and preserves compatible
+  configured output-directory workspaces for the current CLI.
 - Writes repository index artifacts for file tree, important files, stack
   signals, and detected quality commands.
 - Builds and stores exact prompts for each specialist attempt.
@@ -34,8 +35,10 @@ runner when you want to invoke a local Codex CLI command.
 - Runs QA over candidate findings and records approved, rejected, and unresolved
   results.
 - Retries owner agents when QA creates revision requests and retries remain.
-- Emits a fixed Markdown case-study package under `final/docs/`.
-- Emits JSONL RAG card streams under `final/rag_cards/`.
+- Publishes a fixed Markdown case-study package under
+  `<target-repo>/docs/inspector/`.
+- Retains internal Markdown under `final/docs/` and JSONL RAG card streams under
+  `final/rag_cards/`.
 - Supports `status` and `resume` for existing run workspaces.
 
 ## What It Does Not Do

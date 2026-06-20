@@ -119,7 +119,8 @@ Adapter responsibilities include:
   owner schema and evidence rules, and followed by final QA so unresolved issues
   remain visible in QA artifacts when retries are exhausted. Configured
   `maxRetries` can reduce the owner-retry count for a run. The use case then
-  writes the fixed `final/docs/` case-study Markdown package and
+  writes the fixed public `docs/inspector/` Markdown package, retains an
+  internal `final/docs/` Markdown copy, and writes the internal
   `final/rag_cards/` JSONL package from the final approved findings. Shared
   application step logic handles prompt construction, runner execution, output
   persistence, schema validation, and lifecycle status through schema
@@ -137,9 +138,15 @@ Adapter responsibilities include:
   fails safely when state is ambiguous rather than rerunning an approved stage
   or inventing missing prior output.
 - Filesystem adapters read target repository files and write approved outputs.
-- Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
-  directories, write `config.json`, and preserve existing user files by using a
-  unique suffix when a timestamped workspace already exists.
+- Filesystem workspace adapters create compatible
+  `.inspector-runs/<timestamp>_<repo-name>/` style directories, write
+  `config.json`, and preserve existing user files by using a unique suffix when
+  a timestamped workspace already exists.
+- User-data workspace adapters create internal run data under the OS user data
+  root at `inspector/runs/<run-id>/` and maintain a last-run pointer. Defaults
+  are `XDG_DATA_HOME/inspector` or `~/.local/share/inspector` on Linux,
+  `~/Library/Application Support/inspector` on macOS, and
+  `APPDATA/inspector` on Windows.
 - Filesystem repository adapters walk target repositories, provide
   repository-relative file metadata and manifest text to the application layer,
   reject file reads that escape the configured repository root, and write
@@ -179,8 +186,9 @@ Adapter responsibilities include:
   prompt sent to each agent into the run workspace under that agent's attempt
   folder.
 - Validator adapters apply JSON Schema and contract validation.
-- Writer adapters emit final case-study Markdown, inspection reports, and
-  RAG-ready knowledge cards.
+- Writer adapters emit public case-study Markdown to the inspected repository,
+  retain internal final Markdown, and write inspection reports and RAG-ready
+  knowledge cards only to the internal run workspace.
 
 ## Planned Ports
 
@@ -195,6 +203,9 @@ Expected ports include:
 - `AgentRunner` for external worker invocation.
 - `Clock` for timestamps.
 - `RunWorkspaceStore` for creating auditable inspection run workspaces.
+- `UserDataDirectoryProvider` for resolving the OS-specific Inspector data root.
+- `RunDataWorkspaceStore` for creating internal run data workspaces and reading
+  or writing the last-run pointer.
 - `Logger` for user-visible and diagnostic messages.
 - `MemoryStore` for local operational swarm memory.
 - `PromptTemplateReader` for loading shared and agent-specific prompt templates.
@@ -341,11 +352,12 @@ issues and revision requests in artifacts when the retry limit is reached.
 
 ## Final Outputs
 
-The final case-study documentation is written under `final/docs/` as a fixed
-ten-file Markdown package. It may use approved findings only, must exclude
-rejected findings, must preserve finding and QA evidence chains, and must state
-that there is not enough verified evidence when a section has no approved
-support.
+The final case-study documentation is published under
+`<target-repo>/docs/inspector/` as a fixed ten-file Markdown package and is also
+retained internally under `final/docs/`. It may use approved findings only, must
+exclude rejected findings, must preserve finding and QA evidence chains, and
+must state that there is not enough verified evidence when a section has no
+approved support.
 
 RAG-ready knowledge cards should be compact, evidence-linked JSON artifacts for
 future coding agents. The runtime writer emits `patterns.jsonl`, `flows.jsonl`,

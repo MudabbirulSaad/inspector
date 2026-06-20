@@ -33,6 +33,16 @@ export interface RunWorkspaceStore {
   create(request: RunWorkspaceRequest): Promise<RunWorkspace>;
 }
 
+export interface UserDataDirectoryProvider {
+  getInspectorDataRoot(): Promise<string>;
+}
+
+export interface RunDataWorkspaceStore {
+  createRunDataWorkspace(request: RunWorkspaceRequest): Promise<RunWorkspace>;
+  getLastRunPointer(): Promise<string | undefined>;
+  writeLastRunPointer(path: string): Promise<void>;
+}
+
 export type RepositoryEntryKind = "file" | "directory";
 
 export interface RepositoryEntry {

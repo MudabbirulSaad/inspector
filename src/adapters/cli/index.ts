@@ -33,12 +33,14 @@ import {
   NodeQaArtifactWriter,
   NodePromptArtifactWriter,
   NodePromptTemplateReader,
+  NodePublicCaseStudyDocumentWriter,
   NodeQualityCommandReportWriter,
   NodeRagKnowledgeCardWriter,
   NodeRepositoryIndexPromptContextReader,
   NodeRepositoryIndexWriter,
   NodeRepositoryReader,
   NodeRunWorkspaceStore,
+  NodeSplitCaseStudyDocumentWriter,
   NodeSwarmMemoryStore,
   NodeValidationReportWriter,
 } from "../filesystem/index.js";
@@ -175,7 +177,10 @@ export async function runInspectorCli(
       evidenceReports: new NodeEvidenceValidationReportWriter(),
       qaArtifacts: new NodeQaArtifactWriter(),
       qualityCommandReports: new NodeQualityCommandReportWriter(),
-      finalDocs: new NodeCaseStudyDocumentWriter(),
+      finalDocs: new NodeSplitCaseStudyDocumentWriter(
+        new NodeCaseStudyDocumentWriter(),
+        new NodePublicCaseStudyDocumentWriter(repoRoot),
+      ),
       ragCards: new NodeRagKnowledgeCardWriter(),
       processRunner,
       validators: await createSchemaContractValidators(),
@@ -191,7 +196,7 @@ export async function runInspectorCli(
     printProgress(
       stdout,
       command.verbose,
-      `Final output: ${result.workspace.root}/final/docs`,
+      `Final output: ${repoRoot}/docs/inspector`,
     );
     stdout(`Inspection run workspace: ${result.workspace.root}`);
     return { exitCode: 0, workspace: result.workspace };
@@ -313,7 +318,10 @@ async function resumeRunCommand(
     evidenceReports: new NodeEvidenceValidationReportWriter(),
     qaArtifacts: new NodeQaArtifactWriter(),
     qualityCommandReports: new NodeQualityCommandReportWriter(),
-    finalDocs: new NodeCaseStudyDocumentWriter(),
+    finalDocs: new NodeSplitCaseStudyDocumentWriter(
+      new NodeCaseStudyDocumentWriter(),
+      new NodePublicCaseStudyDocumentWriter(config.target.root),
+    ),
     ragCards: new NodeRagKnowledgeCardWriter(),
     processRunner,
     validators: await createSchemaContractValidators(),

@@ -211,6 +211,42 @@ test("omits local agent operational state from index artifacts", async () => {
   );
 });
 
+test("omits generated public Inspector docs from index artifacts", async () => {
+  const reader = new InMemoryRepositoryReader([
+    { path: "docs", kind: "directory" },
+    { path: "docs/inspector", kind: "directory" },
+    {
+      path: "docs/inspector/00-executive-summary.md",
+      kind: "file",
+      sizeBytes: 120,
+    },
+    { path: "docs/architecture.md", kind: "file", sizeBytes: 240 },
+    { path: "README.md", kind: "file", sizeBytes: 120 },
+  ]);
+  const writer = new InMemoryRepositoryIndexWriter();
+
+  await indexTargetRepository({
+    target: {
+      name: "example-service",
+      root: "/repos/example-service",
+    },
+    reader,
+    writer,
+    workspace,
+  });
+
+  assert.equal(
+    writer.files.get("file_tree.txt"),
+    [
+      ".",
+      "README.md",
+      "docs/",
+      "docs/architecture.md",
+      "",
+    ].join("\n"),
+  );
+});
+
 test("omits Inspector dogfood run artifacts from all index artifacts", async () => {
   const reader = new InMemoryRepositoryReader(
     [

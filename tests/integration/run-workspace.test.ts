@@ -15,7 +15,11 @@ import {
   type Clock,
   type RunConfig,
 } from "../../src/index.js";
-import { NodeRunWorkspaceStore } from "../../src/adapters/filesystem/index.js";
+import {
+  NodeRunDataWorkspaceStore,
+  NodeRunWorkspaceStore,
+  NodeUserDataDirectoryProvider,
+} from "../../src/adapters/filesystem/index.js";
 
 const fixedClock: Clock = {
   now: () => new Date("2026-06-20T01:02:03.004Z"),
@@ -146,4 +150,78 @@ test("rejects an invalid output path without deleting the existing file", async 
   );
 
   assert.equal(await readFile(outputDirectory, "utf8"), "user data");
+});
+
+test("user data provider returns platform-appropriate inspector data root", async () => {
+  assert.equal(
+    await new NodeUserDataDirectoryProvider({
+      platform: "linux",
+      env: { XDG_DATA_HOME: "/tmp/xdg-data" },
+      homeDirectory: "/home/example",
+    }).getInspectorDataRoot(),
+    "/tmp/xdg-data/inspector",
+  );
+  assert.equal(
+    await new NodeUserDataDirectoryProvider({
+      platform: "linux",
+      env: {},
+      homeDirectory: "/home/example",
+    }).getInspectorDataRoot(),
+    "/home/example/.local/share/inspector",
+  );
+  assert.equal(
+    await new NodeUserDataDirectoryProvider({
+      platform: "darwin",
+      env: {},
+      homeDirectory: "/Users/example",
+    }).getInspectorDataRoot(),
+    "/Users/example/Library/Application Support/inspector",
+  );
+  assert.equal(
+    await new NodeUserDataDirectoryProvider({
+      platform: "win32",
+      env: { APPDATA: "C:\\Users\\Example\\AppData\\Roaming" },
+      homeDirectory: "C:\\Users\\Example",
+    }).getInspectorDataRoot(),
+    "C:\\Users\\Example\\AppData\\Roaming/inspector",
+  );
+});
+
+test("creates internal run data workspace under the user data root", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "inspector-data-"));
+  const config = createRunConfig(join(tempDirectory, "legacy-out"));
+  const store = new NodeRunDataWorkspaceStore({
+    dataRoot: join(tempDirectory, "inspector"),
+  });
+
+  const workspace = await createInspectionRunWorkspace({
+    config,
+    clock: fixedClock,
+    workspaces: store,
+  });
+
+  assert.equal(
+    workspace.root,
+    join(
+      tempDirectory,
+      "inspector",
+      "runs",
+      "2026-06-20T01-02-03-004Z_example-service",
+    ),
+  );
+  assert.equal((await stat(join(workspace.root, "config.json"))).isFile(), true);
+});
+
+test("writes and reads the last-run pointer", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "inspector-data-"));
+  const store = new NodeRunDataWorkspaceStore({
+    dataRoot: join(tempDirectory, "inspector"),
+  });
+
+  assert.equal(await store.getLastRunPointer(), undefined);
+
+  const runPath = join(tempDirectory, "inspector", "runs", "run-1");
+  await store.writeLastRunPointer(runPath);
+
+  assert.equal(await store.getLastRunPointer(), runPath);
 });

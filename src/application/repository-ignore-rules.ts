@@ -34,6 +34,10 @@ export function isIgnoredRepositoryPath(
   const normalizedPath = normalizeRepositoryPath(path);
   const segments = normalizedPath.split("/");
 
+  if (isPathAtOrBelow(normalizedPath, "docs/inspector")) {
+    return true;
+  }
+
   if (segments.some((segment) => defaultIgnoredRepositoryFolders.has(segment))) {
     return true;
   }

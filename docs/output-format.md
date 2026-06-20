@@ -1,8 +1,35 @@
 # Output Format
 
-Each run creates a unique workspace under the configured output directory. The
-workspace name is derived from the timestamp and repository name, with a suffix
-added if that directory already exists.
+Inspector now separates public development docs from internal run data. Public
+Markdown docs are written to the inspected repository:
+
+```text
+<target-repo>/docs/inspector/
+  00-executive-summary.md
+  01-product-context.md
+  02-architecture-map.md
+  03-feature-flow-traces.md
+  04-pattern-catalog.md
+  05-testing-strategy.md
+  06-tradeoffs-and-risks.md
+  07-adaptation-blueprint.md
+  08-implementation-plan.md
+  09-verification-report.md
+```
+
+Internal run artifacts live in a unique run workspace. The compatibility CLI
+path still creates that workspace under the configured `--out` directory. The
+release UX storage adapter creates the same workspace shape under the OS user
+data root:
+
+```text
+Linux:   XDG_DATA_HOME/inspector or ~/.local/share/inspector
+macOS:   ~/Library/Application Support/inspector
+Windows: APPDATA/inspector
+```
+
+The workspace name is derived from the timestamp and repository name, with a
+suffix added if that directory already exists.
 
 ```text
 <output-path>/<timestamp>_<repo-name>/
@@ -29,8 +56,9 @@ added if that directory already exists.
 The index ignores noisy folders and local operational state, records important
 files, detects stack signals, and detects likely quality commands from
 repository manifests and workflows. Ignored local state includes `.agents/` and
-`.inspector-runs/` so self-inspection runs do not feed private run artifacts
-back into prompts or final evidence.
+`.inspector-runs/`, configured output directories inside the target repository,
+and generated `docs/inspector/` public output so self-inspection runs do not
+feed generated Inspector artifacts back into prompts or final evidence.
 
 ## Memory
 
@@ -91,9 +119,17 @@ ignored local operational folders is treated as unavailable repository evidence.
 
 QA artifacts preserve why a finding passed, failed, or needed revision.
 
-## Final Docs
+## Public Docs
 
-`final/docs/` contains a fixed ten-file Markdown package:
+`<target-repo>/docs/inspector/` contains the user-facing Markdown package.
+Public docs are Markdown only. They do not include raw prompts, raw runner
+output, schema reports, evidence JSON, QA JSON, memory JSONL, internal RAG
+JSONL, or configuration secrets.
+
+## Internal Final Docs
+
+`final/docs/` retains the same fixed ten-file Markdown package inside the run
+workspace for compatibility with status, resume, and artifact inspection:
 
 - `00-executive-summary.md`
 - `01-product-context.md`
