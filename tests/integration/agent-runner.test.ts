@@ -4,6 +4,7 @@ import { execPath } from "node:process";
 
 import { executeAgentRun } from "../../src/application/index.js";
 import {
+  createDefaultScoutArchitectureFakeRunner,
   FakeAgentRunner,
   ProcessCodexAgentRunner,
 } from "../../src/adapters/codex/index.js";
@@ -12,6 +13,8 @@ import type {
   AgentRunner,
   AgentRunRequest,
   AgentRunResult,
+  RepositoryEntry,
+  RepositoryReader,
 } from "../../src/ports/index.js";
 
 test("fake agent runner returns a configured successful result", async () => {
@@ -131,6 +134,52 @@ test("fake agent runner emits configured streaming events and returns them in th
       artifactPath: "agents/scout/attempt-1/output.json",
     },
   ]);
+});
+
+test("default Scout and Architecture fake runner cites a safe readable repository file", async () => {
+  class FixtureRepositoryReader implements RepositoryReader {
+    async listEntries(): Promise<RepositoryEntry[]> {
+      return [
+        { path: "node_modules/package/index.js", kind: "file", sizeBytes: 20 },
+        { path: "dist/bundle.js", kind: "file", sizeBytes: 20 },
+        { path: "large.txt", kind: "file", sizeBytes: 1_000_001 },
+        { path: "src/index.ts", kind: "file", sizeBytes: 32 },
+      ];
+    }
+
+    async readTextFile(path: string): Promise<string> {
+      if (path !== "src/index.ts") {
+        throw new Error(`unexpected read: ${path}`);
+      }
+
+      return "const value = 1;\n";
+    }
+  }
+
+  const reader = new FixtureRepositoryReader();
+  const runner = await createDefaultScoutArchitectureFakeRunner(
+    reader,
+    await reader.listEntries(),
+  );
+
+  const scout = await runner.runAgent({
+    agentId: "scout",
+    attempt: 1,
+    prompt: "Inspect repository.",
+    workspaceRoot: "/tmp/inspection-run",
+  });
+  const architecture = await runner.runAgent({
+    agentId: "architecture",
+    attempt: 1,
+    prompt: "Inspect architecture.",
+    workspaceRoot: "/tmp/inspection-run",
+  });
+
+  assert.equal(JSON.parse(scout.stdout).projectType.evidence[0].file, "src/index.ts");
+  assert.equal(
+    JSON.parse(architecture.stdout).layerMap[0].evidence[0].file,
+    "src/index.ts",
+  );
 });
 
 test("application executes agents through the runner port", async () => {

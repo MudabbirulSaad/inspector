@@ -2,10 +2,14 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+  AgentOutputArtifactWriter,
+  AgentOutputSchemaReader,
   AgentStatusArtifactWriter,
+  EvidenceValidationReportWriter,
   PromptArtifactWriter,
   PromptTemplateReader,
   RepositoryEntry,
+  RepositoryIndexPromptContextReader,
   RepositoryIndexWriter,
   RepositoryReader,
   RunWorkspace,
@@ -223,6 +227,101 @@ export class NodeValidationReportWriter implements ValidationReportWriter {
     await writeFile(path, request.content);
 
     return { path };
+  }
+}
+
+export class NodeAgentOutputArtifactWriter
+  implements AgentOutputArtifactWriter
+{
+  async writeAgentOutput(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.agents,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "output.json");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+export class NodeEvidenceValidationReportWriter
+  implements EvidenceValidationReportWriter
+{
+  async writeEvidenceValidationReport(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.validation,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "evidence.json");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+export class NodeAgentOutputSchemaReader implements AgentOutputSchemaReader {
+  constructor(private readonly schemaRoot: string) {}
+
+  async readAgentOutputSchema(contract: string): Promise<unknown> {
+    return JSON.parse(
+      await readFile(join(this.schemaRoot, `${contract}.schema.json`), "utf8"),
+    ) as unknown;
+  }
+}
+
+export class NodeRepositoryIndexPromptContextReader
+  implements RepositoryIndexPromptContextReader
+{
+  async readRepositoryIndexPromptContext(
+    workspace: RunWorkspace,
+  ): Promise<unknown> {
+    return {
+      repo_summary: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "repo_summary.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      important_files: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "important_files.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      detected_stack: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "detected_stack.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      detected_commands: JSON.parse(
+        await readFile(
+          join(workspace.folders.repoIndex, "detected_commands.json"),
+          "utf8",
+        ),
+      ) as unknown,
+      file_tree: await readFile(
+        join(workspace.folders.repoIndex, "file_tree.txt"),
+        "utf8",
+      ),
+    };
   }
 }
 

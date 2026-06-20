@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { chdir, cwd } from "node:process";
 import test from "node:test";
 
 import { FakeAgentRunner } from "../../src/adapters/codex/index.js";
@@ -220,6 +221,53 @@ test("CLI run creates a run workspace for a valid command", async () => {
     ),
     ".\nREADME.md\n",
   );
+});
+
+test("CLI run loads prompts and schemas when started outside the project root", async () => {
+  const fixture = await createFixture();
+  const unrelatedCwd = join(fixture.tempDirectory, "unrelated-cwd");
+  await mkdir(unrelatedCwd);
+  const originalCwd = cwd();
+
+  try {
+    chdir(unrelatedCwd);
+
+    const result = await runInspectorCli({
+      argv: [
+        "run",
+        fixture.repoPath,
+        "--objective",
+        fixture.objectivePath,
+        "--out",
+        fixture.outPath,
+      ],
+      clock: fixedClock,
+      runner: successfulRunner(),
+      stdout: () => undefined,
+    });
+
+    assert.equal(result.exitCode, 0);
+    const workspaceRoot = join(
+      fixture.outPath,
+      "2026-06-20T01-02-03-004Z_target-repo",
+    );
+    assert.match(
+      await readFile(
+        join(workspaceRoot, "agents", "scout", "attempt-1", "prompt.md"),
+        "utf8",
+      ),
+      /# Agent Prompt: scout/,
+    );
+    assert.match(
+      await readFile(
+        join(workspaceRoot, "validation", "scout", "attempt-1", "report.json"),
+        "utf8",
+      ),
+      /"contract": "scout-output"/,
+    );
+  } finally {
+    chdir(originalCwd);
+  }
 });
 
 test("CLI run reports a missing repository path", async () => {
