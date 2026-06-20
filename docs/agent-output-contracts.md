@@ -57,6 +57,20 @@ files for use by orchestrator, CLI, and test callers. It currently exposes
 validators for findings, QA results, knowledge cards, memory events, and
 inspection reports without duplicating schema definitions in TypeScript.
 
+## Agent Output Validation
+
+The application output validator selects the schema declared by the agent
+contract, parses the raw JSON output, and writes a validation report for the
+agent attempt. Passing reports use `status: "passed"`. Malformed JSON reports
+preserve the parse error with `status: "malformed-json"`, and schema failures
+preserve structured contract, path, keyword, and message details with
+`status: "schema-invalid"`.
+
+The filesystem adapter writes reports to
+`validation/<agent-id>/attempt-<n>/report.json` in the run workspace. These
+reports are intended for later lifecycle transitions, QA review, and retry
+routing.
+
 ## Agent Registry Contracts
 
 `src/agents` defines the fixed runtime agent registry. Every registered agent

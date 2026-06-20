@@ -78,7 +78,11 @@ Application responsibilities include:
   index summaries, previous outputs, memory snapshots, output schemas, evidence
   rules, and retry revision requests.
 - Dispatching specialist agents only when their dependencies are satisfied.
+- Parsing raw agent JSON output and selecting the correct validation contract
+  from the agent registry before downstream QA.
 - Accepting only schema-valid and evidence-backed findings.
+- Preserving validation errors in report artifacts so QA and retry routing can
+  explain malformed JSON and schema failures.
 - Creating revision requests for failed QA and routing them to the responsible
   agent or follow-up agent.
 - Assembling final report and knowledge-card write requests after validation
@@ -110,6 +114,8 @@ Adapter responsibilities include:
   and delegates command execution to the process runner port.
 - Agent status artifact adapters write deterministic lifecycle status snapshots
   into each agent attempt folder.
+- Validation report adapters write deterministic validation reports for each
+  agent attempt into the run workspace.
 - Memory adapters persist local swarm events without exposing raw prompts,
   transcripts, secrets, or private state in public docs. Run memory is
   append-only and lives under the run workspace `memory/` folder.
@@ -136,6 +142,7 @@ Expected ports include:
 - `PromptTemplateReader` for loading shared and agent-specific prompt templates.
 - `PromptArtifactWriter` for saving exact run-specific agent prompts.
 - `AgentStatusArtifactWriter` for saving serialized lifecycle status snapshots.
+- `ValidationReportWriter` for saving parse and schema validation reports.
 - `ArtifactValidator` for schema-backed runtime artifact checks used before
   writing memory or final outputs.
 - `FindingValidator`, `QaValidator`, `KnowledgeCardValidator`, and

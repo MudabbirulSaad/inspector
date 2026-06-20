@@ -13,6 +13,7 @@ import type {
   RunWorkspaceStore,
   SwarmMemoryStore,
   SwarmMemoryStream,
+  ValidationReportWriter,
 } from "../../ports/index.js";
 
 export const filesystemAdapterBoundary = "adapters.filesystem" as const;
@@ -196,6 +197,27 @@ export class NodeAgentStatusArtifactWriter implements AgentStatusArtifactWriter 
       `attempt-${request.attempt}`,
     );
     const path = join(directory, "status.json");
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, request.content);
+
+    return { path };
+  }
+}
+
+export class NodeValidationReportWriter implements ValidationReportWriter {
+  async writeAgentValidationReport(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }> {
+    const directory = join(
+      request.workspace.folders.validation,
+      request.agentId,
+      `attempt-${request.attempt}`,
+    );
+    const path = join(directory, "report.json");
 
     await mkdir(directory, { recursive: true });
     await writeFile(path, request.content);

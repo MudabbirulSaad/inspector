@@ -94,6 +94,15 @@ export interface AgentStatusArtifactWriter {
   }): Promise<{ path: string }>;
 }
 
+export interface ValidationReportWriter {
+  writeAgentValidationReport(request: {
+    workspace: RunWorkspace;
+    agentId: string;
+    attempt: number;
+    content: string;
+  }): Promise<{ path: string }>;
+}
+
 export type AgentRunnerStreamEventKind =
   | "stdout"
   | "stderr"

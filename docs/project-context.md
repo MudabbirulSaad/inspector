@@ -48,7 +48,10 @@ status artifacts under each agent attempt folder. The application layer now
 includes a dependency-aware agent scheduler that runs ready agents in
 deterministic order, executes independent agents in parallel up to a configured
 limit, blocks dependents of failed required agents, and allows continuation
-after optional agent failures. Runtime CLI behavior is still pending.
+after optional agent failures. Agent output validation now selects schemas from
+agent contracts, parses JSON output, records malformed JSON and schema
+violations, and writes validation reports under the run workspace for QA and
+retry routing. Runtime CLI behavior is still pending.
 
 ## Non-Goals
 

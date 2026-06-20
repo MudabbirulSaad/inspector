@@ -34,7 +34,9 @@ append-only run memory, prompt template loading, and prompt artifact writing.
 Runner ports now exist with deterministic fake and process-backed Codex agent
 runners plus a real Node process runner for local command execution. Agent
 lifecycle transitions are now modeled as an auditable state machine with status
-artifacts written to agent attempt folders.
+artifacts written to agent attempt folders. Agent output validation now parses
+raw JSON, selects schemas from agent contracts, reports malformed JSON and
+schema violations, and writes validation reports to the run workspace.
 
 ## Fixed Milestones
 
@@ -685,4 +687,44 @@ git status
 
 ```bash
 feat(orchestrator): schedule agents with dependency-aware parallelism
+```
+
+### Milestone 16: Schema Validation for Agent Outputs
+
+#### Goal
+
+Validate agent outputs against contracts.
+
+#### Tasks
+
+- Added an application output validator that selects the schema declared by the
+  agent contract.
+- Parsed raw JSON agent output and reported malformed JSON without throwing.
+- Reported schema violations with structured contract, path, keyword, and
+  message details.
+- Wrote deterministic validation reports for each agent attempt through a port.
+- Added a filesystem validation report writer for
+  `validation/<agent-id>/attempt-<n>/report.json`.
+- Preserved validation errors in reports for downstream QA and retry routing.
+
+#### TDD
+
+Added integration tests one behavior at a time for valid output, malformed
+JSON, missing fields, wrong selected schema, useful error messages, and
+filesystem report persistence.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(validation): validate agent outputs against contracts
 ```
