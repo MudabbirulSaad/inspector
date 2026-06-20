@@ -17,10 +17,23 @@ import {
 } from "../../src/adapters/filesystem/index.js";
 
 class InMemoryRepositoryReader implements RepositoryReader {
-  constructor(private readonly entries: RepositoryEntry[]) {}
+  constructor(
+    private readonly entries: RepositoryEntry[],
+    private readonly files = new Map<string, string>(),
+  ) {}
 
   async listEntries(): Promise<RepositoryEntry[]> {
     return this.entries;
+  }
+
+  async readTextFile(path: string): Promise<string> {
+    const content = this.files.get(path);
+
+    if (content === undefined) {
+      throw new Error(`Missing fixture file: ${path}`);
+    }
+
+    return content;
   }
 }
 
@@ -151,17 +164,20 @@ test("omits noisy repository folders from index artifacts", async () => {
 });
 
 test("detects important repository files for inspection planning", async () => {
-  const reader = new InMemoryRepositoryReader([
-    { path: "AGENTS.md", kind: "file", sizeBytes: 100 },
-    { path: "README.md", kind: "file", sizeBytes: 120 },
-    { path: "docs/architecture.md", kind: "file", sizeBytes: 200 },
-    { path: "docs", kind: "directory" },
-    { path: "package.json", kind: "file", sizeBytes: 300 },
-    { path: "schemas/finding.schema.json", kind: "file", sizeBytes: 400 },
-    { path: "schemas", kind: "directory" },
-    { path: "src/index.ts", kind: "file", sizeBytes: 42 },
-    { path: "tsconfig.json", kind: "file", sizeBytes: 500 },
-  ]);
+  const reader = new InMemoryRepositoryReader(
+    [
+      { path: "AGENTS.md", kind: "file", sizeBytes: 100 },
+      { path: "README.md", kind: "file", sizeBytes: 120 },
+      { path: "docs/architecture.md", kind: "file", sizeBytes: 200 },
+      { path: "docs", kind: "directory" },
+      { path: "package.json", kind: "file", sizeBytes: 300 },
+      { path: "schemas/finding.schema.json", kind: "file", sizeBytes: 400 },
+      { path: "schemas", kind: "directory" },
+      { path: "src/index.ts", kind: "file", sizeBytes: 42 },
+      { path: "tsconfig.json", kind: "file", sizeBytes: 500 },
+    ],
+    new Map([["package.json", "{}"]]),
+  );
   const writer = new InMemoryRepositoryIndexWriter();
 
   await indexTargetRepository({
@@ -261,6 +277,10 @@ test("walks a target repository and writes repo_index artifacts through filesyst
   await mkdir(join(targetRoot, "node_modules", "pkg"), { recursive: true });
   await mkdir(repoIndexRoot, { recursive: true });
   await writeFile(join(targetRoot, "README.md"), "# Example\n");
+  await writeFile(
+    join(targetRoot, "package.json"),
+    JSON.stringify({ scripts: { test: "node --test" } }),
+  );
   await writeFile(join(targetRoot, "src", "index.ts"), "export {};\n");
   await writeFile(join(targetRoot, "node_modules", "pkg", "index.js"), "");
 
@@ -285,6 +305,7 @@ test("walks a target repository and writes repo_index artifacts through filesyst
     [
       ".",
       "README.md",
+      "package.json",
       "src/",
       "src/index.ts",
       "",
@@ -299,7 +320,267 @@ test("walks a target repository and writes repo_index artifacts through filesyst
           reason: "repository documentation",
           sizeBytes: 10,
         },
+        {
+          path: "package.json",
+          reason: "package manifest",
+          sizeBytes: 34,
+        },
       ],
     },
   );
+  assert.deepEqual(
+    JSON.parse(await readFile(join(repoIndexRoot, "detected_commands.json"), "utf8")),
+    {
+      commands: [
+        { category: "test", command: "npm test", source: "package.json" },
+      ],
+      missing: ["build", "dev", "format", "lint", "typecheck"],
+    },
+  );
+  assert.deepEqual(
+    JSON.parse(await readFile(join(repoIndexRoot, "detected_stack.json"), "utf8")),
+    {
+      stacks: [
+        {
+          name: "node",
+          confidence: "high",
+          evidence: ["package.json"],
+        },
+        {
+          name: "typescript",
+          confidence: "high",
+          evidence: ["package.json", "src/index.ts"],
+        },
+      ],
+      packageManager: {
+        name: "npm",
+        evidence: ["package.json"],
+      },
+    },
+  );
+});
+
+test("detects Node package scripts as quality commands", async () => {
+  const reader = new InMemoryRepositoryReader(
+    [
+      { path: "package.json", kind: "file", sizeBytes: 250 },
+      { path: "src", kind: "directory" },
+      { path: "src/index.ts", kind: "file", sizeBytes: 42 },
+    ],
+    new Map([
+      [
+        "package.json",
+        JSON.stringify({
+          scripts: {
+            test: "node --test",
+            typecheck: "tsc --noEmit",
+            lint: "eslint .",
+            build: "tsc",
+            dev: "tsx src/index.ts",
+            format: "prettier --write .",
+          },
+          devDependencies: {
+            typescript: "^6.0.3",
+            tsx: "^4.22.4",
+          },
+        }),
+      ],
+    ]),
+  );
+  const writer = new InMemoryRepositoryIndexWriter();
+
+  await indexTargetRepository({
+    target: {
+      name: "example-service",
+      root: "/repos/example-service",
+    },
+    reader,
+    writer,
+    workspace,
+  });
+
+  assert.deepEqual(JSON.parse(writer.files.get("detected_commands.json") ?? ""), {
+    commands: [
+      { category: "build", command: "npm run build", source: "package.json" },
+      { category: "dev", command: "npm run dev", source: "package.json" },
+      { category: "format", command: "npm run format", source: "package.json" },
+      { category: "lint", command: "npm run lint", source: "package.json" },
+      { category: "test", command: "npm test", source: "package.json" },
+      {
+        category: "typecheck",
+        command: "npm run typecheck",
+        source: "package.json",
+      },
+    ],
+    missing: [],
+  });
+  assert.deepEqual(JSON.parse(writer.files.get("detected_stack.json") ?? ""), {
+    stacks: [
+      {
+        name: "node",
+        confidence: "high",
+        evidence: ["package.json"],
+      },
+      {
+        name: "typescript",
+        confidence: "high",
+        evidence: ["package.json", "src/index.ts"],
+      },
+    ],
+    packageManager: {
+      name: "npm",
+      evidence: ["package.json"],
+    },
+  });
+});
+
+test("reports missing command categories and detects package managers from lockfiles", async () => {
+  const cases = [
+    {
+      lockfile: "package-lock.json",
+      packageManager: "npm",
+      expectedTestCommand: "npm test",
+    },
+    {
+      lockfile: "yarn.lock",
+      packageManager: "yarn",
+      expectedTestCommand: "yarn test",
+    },
+    {
+      lockfile: "pnpm-lock.yaml",
+      packageManager: "pnpm",
+      expectedTestCommand: "pnpm test",
+    },
+  ] as const;
+
+  for (const fixture of cases) {
+    const reader = new InMemoryRepositoryReader(
+      [
+        { path: fixture.lockfile, kind: "file", sizeBytes: 10 },
+        { path: "package.json", kind: "file", sizeBytes: 80 },
+      ],
+      new Map([
+        [
+          "package.json",
+          JSON.stringify({
+            scripts: {
+              test: "node --test",
+            },
+          }),
+        ],
+      ]),
+    );
+    const writer = new InMemoryRepositoryIndexWriter();
+
+    await indexTargetRepository({
+      target: {
+        name: "example-service",
+        root: "/repos/example-service",
+      },
+      reader,
+      writer,
+      workspace,
+    });
+
+    assert.deepEqual(
+      JSON.parse(writer.files.get("detected_commands.json") ?? ""),
+      {
+        commands: [
+          {
+            category: "test",
+            command: fixture.expectedTestCommand,
+            source: "package.json",
+          },
+        ],
+        missing: ["build", "dev", "format", "lint", "typecheck"],
+      },
+    );
+    assert.deepEqual(
+      JSON.parse(writer.files.get("detected_stack.json") ?? "").packageManager,
+      {
+        name: fixture.packageManager,
+        evidence: [fixture.lockfile],
+      },
+    );
+  }
+});
+
+test("detects stack signals from TypeScript, Docker, GitHub Actions, and non-Node manifests", async () => {
+  const reader = new InMemoryRepositoryReader(
+    [
+      { path: ".github", kind: "directory" },
+      { path: ".github/workflows", kind: "directory" },
+      { path: ".github/workflows/ci.yml", kind: "file", sizeBytes: 80 },
+      { path: "Cargo.toml", kind: "file", sizeBytes: 70 },
+      { path: "Dockerfile", kind: "file", sizeBytes: 30 },
+      { path: "go.mod", kind: "file", sizeBytes: 60 },
+      { path: "package.json", kind: "file", sizeBytes: 120 },
+      { path: "pyproject.toml", kind: "file", sizeBytes: 90 },
+      { path: "requirements.txt", kind: "file", sizeBytes: 20 },
+      { path: "tsconfig.json", kind: "file", sizeBytes: 110 },
+    ],
+    new Map([
+      [
+        "package.json",
+        JSON.stringify({
+          scripts: {},
+        }),
+      ],
+    ]),
+  );
+  const writer = new InMemoryRepositoryIndexWriter();
+
+  await indexTargetRepository({
+    target: {
+      name: "polyglot-service",
+      root: "/repos/polyglot-service",
+    },
+    reader,
+    writer,
+    workspace,
+  });
+
+  assert.deepEqual(JSON.parse(writer.files.get("detected_stack.json") ?? ""), {
+    stacks: [
+      {
+        name: "node",
+        confidence: "high",
+        evidence: ["package.json"],
+      },
+      {
+        name: "typescript",
+        confidence: "high",
+        evidence: ["package.json", "tsconfig.json"],
+      },
+      {
+        name: "python",
+        confidence: "medium",
+        evidence: ["pyproject.toml", "requirements.txt"],
+      },
+      {
+        name: "rust",
+        confidence: "medium",
+        evidence: ["Cargo.toml"],
+      },
+      {
+        name: "go",
+        confidence: "medium",
+        evidence: ["go.mod"],
+      },
+      {
+        name: "docker",
+        confidence: "medium",
+        evidence: ["Dockerfile"],
+      },
+      {
+        name: "github-actions",
+        confidence: "medium",
+        evidence: [".github/workflows/ci.yml"],
+      },
+    ],
+    packageManager: {
+      name: "npm",
+      evidence: ["package.json"],
+    },
+  });
 });

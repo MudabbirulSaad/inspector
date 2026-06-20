@@ -43,6 +43,7 @@ export interface RepositoryEntry {
 
 export interface RepositoryReader {
   listEntries(): Promise<RepositoryEntry[]>;
+  readTextFile(path: string): Promise<string>;
 }
 
 export interface RepositoryIndexWriter {

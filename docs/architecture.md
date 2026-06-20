@@ -69,6 +69,8 @@ Application responsibilities include:
   artifacts are written.
 - Building deterministic repository index artifacts from repository metadata
   gathered through repository access ports.
+- Detecting project stack signals and quality commands from repository manifests
+  and workflow files so later planning can choose validation commands.
 - Building the repository inspection plan from indexed repository metadata.
 - Dispatching specialist agents only when their dependencies are satisfied.
 - Accepting only schema-valid and evidence-backed findings.
@@ -90,9 +92,9 @@ Adapter responsibilities include:
   directories, write `config.json`, and preserve existing user files by using a
   unique suffix when a timestamped workspace already exists.
 - Filesystem repository adapters walk target repositories, provide
-  repository-relative file metadata to the application layer, and write
-  approved `repo_index/` artifacts without leaking Node filesystem APIs into the
-  core.
+  repository-relative file metadata and manifest text to the application layer,
+  and write approved `repo_index/` artifacts without leaking Node filesystem
+  APIs into the core.
 - Process adapters run local commands behind deterministic ports.
 - Codex runner adapters invoke external AI workers and return structured raw
   outputs for validation.

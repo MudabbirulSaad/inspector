@@ -31,8 +31,8 @@ examples, schema/example validation tests, TypeScript configuration, lint
 tooling, schema-aligned domain model exports, minimal hexagonal source
 boundaries, runtime JSON Schema validators for core agent output contracts, an
 auditable run workspace creation port with a filesystem adapter, and a
-deterministic repository indexer that emits `repo_index/` artifacts. Runtime CLI
-behavior is still pending.
+deterministic repository indexer that emits `repo_index/` artifacts including
+stack and quality-command detection. Runtime CLI behavior is still pending.
 
 ## Non-Goals
 

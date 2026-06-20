@@ -26,8 +26,9 @@ and invalid output paths that must not delete user files.
 Repository indexer tests use in-memory repository and writer ports for
 application behavior, then temporary fixture repositories for the filesystem
 adapter. They cover tree rendering, noisy-folder ignores, important file
-detection, huge-file skipping, and stable ordering through the public indexer
-use case.
+detection, huge-file skipping, stable ordering, Node package script command
+detection, package-manager lockfile detection, missing command categories, and
+stack signals through the public indexer use case.
 
 ## Contract Tests
 

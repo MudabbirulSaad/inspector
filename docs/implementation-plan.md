@@ -340,3 +340,47 @@ git status
 ```bash
 feat(repo): index target repositories deterministically
 ```
+
+### Milestone 08: Stack and Command Detection
+
+#### Goal
+
+Detect project stack and quality commands.
+
+#### Tasks
+
+- Extended repository indexing to emit `detected_stack.json` and
+  `detected_commands.json` in `repo_index/`.
+- Added repository text reads through the repository access port so application
+  code can parse manifests without importing filesystem APIs.
+- Detected Node package scripts for `test`, `typecheck`, `lint`, `build`,
+  `dev`, and `format` command categories.
+- Reported missing command categories deterministically.
+- Detected npm, yarn, and pnpm package managers from lockfiles, falling back to
+  npm when only `package.json` is present.
+- Detected stack signals from `package.json`, lockfiles, `tsconfig.json`,
+  TypeScript source files, `pyproject.toml`, `requirements.txt`, `Cargo.toml`,
+  `go.mod`, Dockerfiles, and GitHub Actions workflow files.
+- Kept V1 command detection focused on Node.js and TypeScript package scripts.
+
+#### TDD
+
+Added repository indexer tests one behavior at a time for package scripts,
+missing command categories, package manager lockfiles, stack detection fixtures,
+and filesystem adapter output of the new artifacts.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(repo): detect project stack and quality commands
+```

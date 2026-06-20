@@ -1,4 +1,4 @@
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
@@ -52,6 +52,10 @@ export class NodeRepositoryReader implements RepositoryReader {
 
   async listEntries(): Promise<RepositoryEntry[]> {
     return this.walkDirectory("");
+  }
+
+  async readTextFile(path: string): Promise<string> {
+    return readFile(join(this.root, path), "utf8");
   }
 
   private async walkDirectory(relativeDirectory: string): Promise<RepositoryEntry[]> {
