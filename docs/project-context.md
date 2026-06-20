@@ -109,7 +109,11 @@ insufficient-evidence language. The RAG knowledge card writer now emits
 schema-valid `final/rag_cards/{patterns,flows,decisions,warnings}.jsonl` streams
 from QA-approved findings only, excludes rejected findings, preserves finding
 evidence references and tags, routes Flow Tracer findings to `flows.jsonl`, and
-records source repository plus confidence metadata. Full scheduler-driven
+records source repository plus confidence metadata. Fast end-to-end fixture
+tests now run the full fake-run pipeline against `tests/fixtures/tiny-node-app`
+and `tests/fixtures/tiny-layered-app`, verifying workspace, indexing, agent
+order, memory, validation, QA approval, final docs, and RAG-card artifacts
+without network calls or a real Codex dependency. Full scheduler-driven
 multi-agent orchestration is still pending.
 
 ## Non-Goals

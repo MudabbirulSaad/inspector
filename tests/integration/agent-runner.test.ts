@@ -136,7 +136,7 @@ test("fake agent runner emits configured streaming events and returns them in th
   ]);
 });
 
-test("default Scout, Architecture, Pattern Miner, Flow Tracer, and Testing Strategy fake runner cites a safe readable repository file", async () => {
+test("default fake runner outputs cite a safe readable repository file", async () => {
   class FixtureRepositoryReader implements RepositoryReader {
     async listEntries(): Promise<RepositoryEntry[]> {
       return [
@@ -192,6 +192,12 @@ test("default Scout, Architecture, Pattern Miner, Flow Tracer, and Testing Strat
     prompt: "Inspect tests.",
     workspaceRoot: "/tmp/inspection-run",
   });
+  const tradeoffAnalyst = await runner.runAgent({
+    agentId: "tradeoff_analyst",
+    attempt: 1,
+    prompt: "Inspect tradeoffs.",
+    workspaceRoot: "/tmp/inspection-run",
+  });
 
   assert.equal(JSON.parse(scout.stdout).projectType.evidence[0].file, "src/index.ts");
   assert.equal(
@@ -208,6 +214,10 @@ test("default Scout, Architecture, Pattern Miner, Flow Tracer, and Testing Strat
   );
   assert.equal(
     JSON.parse(testingStrategy.stdout).commandEvidence[0].evidence[0].file,
+    "src/index.ts",
+  );
+  assert.equal(
+    JSON.parse(tradeoffAnalyst.stdout).strongDecisions[0].evidence[0].file,
     "src/index.ts",
   );
 });

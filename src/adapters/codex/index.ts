@@ -409,6 +409,108 @@ export async function createDefaultScoutArchitectureFakeRunner(
     streamingEvents: [],
   };
 
+  const tradeoffAnalystResult: AgentRunResult = {
+    stdout: `${JSON.stringify({
+      strongDecisions: [
+        {
+          decision: "Keep default fake-runner output evidence-backed.",
+          tradeoff:
+            "The fake runner stays deterministic and safe, but its conclusions are intentionally shallow.",
+          consequence:
+            "Inspection reports remain traceable while warning users not to treat fake output as deep analysis.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      weakDecisions: [
+        {
+          decision: "Use one selected repository file as default evidence.",
+          tradeoff:
+            "This keeps fake runs fast and offline, but it cannot prove source-level architecture.",
+          risk: "Readers may overinterpret placeholder findings if they ignore confidence and recommendations.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      overengineeringRisks: [
+        {
+          risk: "Running every specialist against a tiny fixture can add orchestration overhead.",
+          tradeoff:
+            "The full fake pipeline verifies artifact contracts at the cost of shallow specialist content.",
+          consequence:
+            "Small repositories should keep unsupported sections explicitly evidence-limited.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      underengineeringRisks: [
+        {
+          risk: "Skipping the tradeoff step would leave the fake pipeline behind the production sequence.",
+          tradeoff:
+            "A complete fake pipeline catches orchestration drift without requiring a real AI runner.",
+          consequence:
+            "Tests can verify final docs and RAG cards across all current specialist outputs.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      hiddenAssumptions: [
+        {
+          assumption: "The selected evidence file is sufficient for placeholder tradeoff output.",
+          whyItMatters:
+            "The fake runner must make shallow evidence limits visible instead of implying a deep review.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      agentSafetyRisks: [
+        {
+          risk: "Fake outputs could be mistaken for real inspection findings.",
+          tradeoff:
+            "Deterministic fake output is useful for tests, but recommendations must steer users toward real runners for decisions.",
+          consequence:
+            "Final artifacts should preserve low confidence and explicit evidence boundaries.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      adaptationWarnings: [
+        {
+          warning:
+            "Do not adapt default fake-runner tradeoffs as source-level architecture advice.",
+          repoSpecificContext:
+            "The default fake runner cites one repository file as placeholder evidence.",
+          adaptationAdvice:
+            "Require source-level evidence from a real runner before copying tradeoff guidance.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          confidence: 0.4,
+        },
+      ],
+      findings: [
+        {
+          id: "finding-tradeoff-analyst-001",
+          agent: "tradeoff_analyst",
+          severity: "medium",
+          claim:
+            "The default Tradeoff Analyst result is safe for fake-run verification but not deep repository analysis.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          recommendation:
+            "Use the fake runner for deterministic pipeline tests and configure a real runner for decision-making.",
+          confidence: 0.4,
+          validation: ["schema-valid", "evidence-valid"],
+          tags: ["tradeoff", "fake-runner"],
+          cardType: "warning",
+        },
+      ],
+    })}\n`,
+    stderr: "",
+    exitCode: 0,
+    startedAt: new Date(0).toISOString(),
+    completedAt: new Date(0).toISOString(),
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+
   return new FakeAgentRunner({
     results: [
       scoutResult,
@@ -416,6 +518,7 @@ export async function createDefaultScoutArchitectureFakeRunner(
       patternMinerResult,
       flowTracerResult,
       testingStrategyResult,
+      tradeoffAnalystResult,
     ],
   });
 }

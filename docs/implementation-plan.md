@@ -1497,3 +1497,46 @@ git status
 ```bash
 feat(validation): execute safe quality commands
 ```
+
+### Milestone 33: End-to-End Fixture Inspection
+
+#### Goal
+
+Create fast end-to-end fixture tests for the full fake-run inspection pipeline.
+
+#### Tasks
+
+- Added checked-in fixture repositories under `tests/fixtures/tiny-node-app`
+  and `tests/fixtures/tiny-layered-app`.
+- Added E2E coverage that runs `inspector run` through the public CLI adapter
+  with the deterministic fake runner and a fake clock.
+- Verified run workspace creation, repository index artifacts, specialist agent
+  execution order, memory writes, validation command and schema/evidence
+  reports, QA approval artifacts, final case-study docs, and RAG-card streams.
+- Extended the default fake runner with schema-valid Tradeoff Analyst output so
+  the fake-run pipeline matches the current Scout/Architecture/Pattern
+  Miner/Flow Tracer/Testing Strategy/Tradeoff Analyst runtime sequence.
+- Included `tests/e2e/*.test.ts` in `npm test` and `npm run test:watch`.
+
+#### TDD
+
+Added the E2E test first. The initial red run failed because the checked-in
+fixture repositories did not exist; after adding fixtures, the next red run
+exposed the missing Tradeoff Analyst output in the default fake runner. The
+fixture pipeline passed after adding that output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+test(e2e): verify fake-run inspection pipeline
+```
