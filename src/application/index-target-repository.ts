@@ -9,8 +9,10 @@ import { detectRepositoryCommands } from "./detect-repository-commands.js";
 import { detectRepositoryStack } from "./detect-repository-stack.js";
 
 const ignoredRepositoryFolders = new Set([
+  ".agents",
   ".cache",
   ".git",
+  ".inspector-runs",
   ".next",
   "build",
   "coverage",

@@ -311,6 +311,59 @@ test("evidence file loading reads only cited repository files", async () => {
   assert.deepEqual(reader.reads, ["src/application/orchestrate.ts"]);
 });
 
+test("evidence file loading ignores local agent operational state", async () => {
+  const reader = new RecordingRepositoryReader({
+    ".agents/memory.md": "private memory\n",
+    ".inspector-runs/run/agents/scout/output.json": "{}\n",
+    "src/application/orchestrate.ts": "one\ntwo\nthree\nfour\n",
+  });
+  const repositoryFiles = await repositoryFilesForEvidence(
+    reader,
+    [
+      {
+        path: ".agents/memory.md",
+        kind: "file",
+        sizeBytes: 15,
+      },
+      {
+        path: ".inspector-runs/run/agents/scout/output.json",
+        kind: "file",
+        sizeBytes: 3,
+      },
+      {
+        path: "src/application/orchestrate.ts",
+        kind: "file",
+        sizeBytes: 16,
+      },
+    ],
+    [
+      {
+        file: ".agents/memory.md",
+        lineStart: 1,
+        lineEnd: 1,
+      },
+      {
+        file: ".inspector-runs/run/agents/scout/output.json",
+        lineStart: 1,
+        lineEnd: 1,
+      },
+      {
+        file: "src/application/orchestrate.ts",
+        lineStart: 1,
+        lineEnd: 1,
+      },
+    ],
+  );
+
+  assert.deepEqual(repositoryFiles, [
+    {
+      path: "src/application/orchestrate.ts",
+      lineCount: 4,
+    },
+  ]);
+  assert.deepEqual(reader.reads, ["src/application/orchestrate.ts"]);
+});
+
 class RecordingRepositoryReader implements RepositoryReader {
   readonly reads: string[] = [];
 

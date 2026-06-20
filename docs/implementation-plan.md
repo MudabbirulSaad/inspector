@@ -331,7 +331,8 @@ Implement deterministic repository indexing.
 - Added `indexTargetRepository` in the application layer to produce
   `file_tree.txt`, `repo_summary.json`, and `important_files.json`.
 - Ignored noisy repository folders such as `.git`, `node_modules`, `dist`,
-  `build`, `coverage`, `.next`, `.cache`, and `vendor`.
+  `build`, `coverage`, `.next`, `.cache`, and `vendor`, plus local agent
+  operational state such as `.agents/` and `.inspector-runs/`.
 - Detected important repository files for inspection planning, including
   repository guidance, documentation, package manifests, tooling
   configuration, and schema contracts.

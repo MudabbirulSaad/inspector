@@ -46,8 +46,10 @@ export interface EvidenceValidationResult {
 
 const evidenceTextMaxBytes = 1_000_000;
 const ignoredEvidenceFolders = new Set([
+  ".agents",
   ".cache",
   ".git",
+  ".inspector-runs",
   ".next",
   "build",
   "coverage",

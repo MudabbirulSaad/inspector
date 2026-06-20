@@ -163,6 +163,54 @@ test("omits noisy repository folders from index artifacts", async () => {
   );
 });
 
+test("omits local agent operational state from index artifacts", async () => {
+  const reader = new InMemoryRepositoryReader([
+    { path: ".agents", kind: "directory" },
+    { path: ".agents/memory.md", kind: "file", sizeBytes: 100 },
+    { path: ".agents/state", kind: "directory" },
+    { path: ".agents/state/run/output.json", kind: "file", sizeBytes: 200 },
+    { path: ".inspector-runs", kind: "directory" },
+    {
+      path: ".inspector-runs/2026-06-20T00-00-00-000Z_repo/config.json",
+      kind: "file",
+      sizeBytes: 300,
+    },
+    { path: "README.md", kind: "file", sizeBytes: 120 },
+    { path: "src", kind: "directory" },
+    { path: "src/index.ts", kind: "file", sizeBytes: 42 },
+  ]);
+  const writer = new InMemoryRepositoryIndexWriter();
+
+  await indexTargetRepository({
+    target: {
+      name: "example-service",
+      root: "/repos/example-service",
+    },
+    reader,
+    writer,
+    workspace,
+  });
+
+  assert.equal(
+    writer.files.get("file_tree.txt"),
+    [
+      ".",
+      "README.md",
+      "src/",
+      "src/index.ts",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(
+    JSON.parse(writer.files.get("repo_summary.json") ?? "").totals,
+    {
+      files: 2,
+      directories: 1,
+      skippedFiles: 0,
+    },
+  );
+});
+
 test("detects important repository files for inspection planning", async () => {
   const reader = new InMemoryRepositoryReader(
     [

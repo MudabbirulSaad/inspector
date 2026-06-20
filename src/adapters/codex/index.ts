@@ -554,8 +554,10 @@ function isIgnoredRepositoryEntry(path: string): boolean {
     .split("/")
     .some((segment) =>
       new Set([
+        ".agents",
         ".cache",
         ".git",
+        ".inspector-runs",
         ".next",
         "build",
         "coverage",

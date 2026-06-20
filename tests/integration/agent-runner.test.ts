@@ -140,6 +140,12 @@ test("default fake runner outputs cite a safe readable repository file", async (
   class FixtureRepositoryReader implements RepositoryReader {
     async listEntries(): Promise<RepositoryEntry[]> {
       return [
+        { path: ".agents/memory.md", kind: "file", sizeBytes: 20 },
+        {
+          path: ".inspector-runs/run/agents/scout/output.json",
+          kind: "file",
+          sizeBytes: 20,
+        },
         { path: "node_modules/package/index.js", kind: "file", sizeBytes: 20 },
         { path: "dist/bundle.js", kind: "file", sizeBytes: 20 },
         { path: "large.txt", kind: "file", sizeBytes: 1_000_001 },

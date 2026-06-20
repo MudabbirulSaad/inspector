@@ -26,8 +26,11 @@ added if that directory already exists.
 - `detected_stack.json`
 - `detected_commands.json`
 
-The index ignores noisy folders, records important files, detects stack signals,
-and detects likely quality commands from repository manifests and workflows.
+The index ignores noisy folders and local operational state, records important
+files, detects stack signals, and detects likely quality commands from
+repository manifests and workflows. Ignored local state includes `.agents/` and
+`.inspector-runs/` so self-inspection runs do not feed private run artifacts
+back into prompts or final evidence.
 
 ## Memory
 
@@ -74,7 +77,8 @@ validation/<agent-id>/attempt-<n>/
 ```
 
 `report.json` records JSON parse and schema validation results. `evidence.json`
-records repository path and line-range evidence validation.
+records repository path and line-range evidence validation. Evidence from
+ignored local operational folders is treated as unavailable repository evidence.
 
 ## QA
 
