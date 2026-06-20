@@ -3,6 +3,7 @@ import type {
   ArchitectureOutput,
   Evidence,
   Finding,
+  FlowTracerOutput,
   PatternMinerOutput,
   RevisionRequest,
   RunConfig,
@@ -273,6 +274,58 @@ export async function runScoutArchitectureInspection(
     });
   }
 
+  const flowTracerSchemaResult = await runAgentWorkflowStep({
+    input,
+    workspace,
+    agentId: "flow_tracer",
+    progressName: "Flow Tracer",
+    repoIndexSummary,
+    memorySnapshot,
+    previousOutputs: {
+      scout: scoutOutput,
+      architecture: architectureOutput,
+      pattern_miner: patternMinerOutput,
+    },
+  });
+
+  if (!flowTracerSchemaResult.valid) {
+    throw new InspectionRunFailedError(
+      `Flow Tracer schema validation failed: ${flowTracerSchemaResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+  schemaReports.push({ agentId: "flow_tracer", valid: true, errors: [] });
+
+  const flowTracerOutput = flowTracerSchemaResult.value as FlowTracerOutput;
+  agentOutputs.flow_tracer = flowTracerOutput;
+
+  input.progress?.("Validating Flow Tracer evidence");
+  const flowTracerEvidenceResult = await validateEvidenceForAgent({
+    agentId: "flow_tracer",
+    workspace,
+    repositoryReader: input.repositoryReader,
+    entries,
+    findings: flowTracerEvidenceFindings(flowTracerOutput),
+    evidenceReports: input.evidenceReports,
+  });
+
+  if (!flowTracerEvidenceResult.valid) {
+    throw new InspectionRunFailedError(
+      `Flow Tracer evidence validation failed: ${flowTracerEvidenceResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+  evidenceReports.push({ agentId: "flow_tracer", valid: true, errors: [] });
+
+  for (const finding of flowTracerOutput.findings) {
+    candidateFindings.push(finding);
+    await appendSwarmFinding({
+      finding,
+      memory: runMemory,
+      validator: input.validators.finding,
+    });
+  }
+
   input.progress?.("Running QA verification");
   let qa = await verifyFindingsWithQa({
     candidateFindings,
@@ -374,7 +427,7 @@ export async function runScoutArchitectureInspection(
 async function runAgentWorkflowStep(input: {
   input: RunScoutArchitectureInspectionInput;
   workspace: RunWorkspace;
-  agentId: "scout" | "architecture" | "pattern_miner";
+  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer";
   progressName: string;
   repoIndexSummary: unknown;
   memorySnapshot: string;
@@ -477,7 +530,7 @@ async function routeQaRevisionRequests(input: {
   revisionRequests: RevisionRequest[];
 }): Promise<void> {
   const requestsByOwner = new Map<
-    "scout" | "architecture" | "pattern_miner",
+    "scout" | "architecture" | "pattern_miner" | "flow_tracer",
     RevisionRequest[]
   >();
 
@@ -485,7 +538,8 @@ async function routeQaRevisionRequests(input: {
     if (
       request.targetAgent === "scout" ||
       request.targetAgent === "architecture" ||
-      request.targetAgent === "pattern_miner"
+      request.targetAgent === "pattern_miner" ||
+      request.targetAgent === "flow_tracer"
     ) {
       requestsByOwner.set(request.targetAgent, [
         ...(requestsByOwner.get(request.targetAgent) ?? []),
@@ -567,11 +621,15 @@ async function routeQaRevisionRequests(input: {
 }
 
 function displayNameForAgent(
-  agentId: "scout" | "architecture" | "pattern_miner",
+  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer",
 ): string {
-  return agentId === "pattern_miner"
-    ? "Pattern Miner"
-    : agentId[0]?.toUpperCase() + agentId.slice(1);
+  if (agentId === "pattern_miner") {
+    return "Pattern Miner";
+  }
+  if (agentId === "flow_tracer") {
+    return "Flow Tracer";
+  }
+  return agentId[0]?.toUpperCase() + agentId.slice(1);
 }
 
 function replaceSchemaReport(
@@ -608,7 +666,7 @@ function replaceCandidateFindingsForAgent(
 }
 
 function findingsForAgentOutput(
-  agentId: "scout" | "architecture" | "pattern_miner",
+  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer",
   output: unknown,
 ): Finding[] {
   if (agentId === "scout") {
@@ -617,11 +675,14 @@ function findingsForAgentOutput(
   if (agentId === "architecture") {
     return (output as ArchitectureOutput).findings;
   }
-  return (output as PatternMinerOutput).findings;
+  if (agentId === "pattern_miner") {
+    return (output as PatternMinerOutput).findings;
+  }
+  return (output as FlowTracerOutput).findings;
 }
 
 function evidenceFindingsForAgentOutput(
-  agentId: "scout" | "architecture" | "pattern_miner",
+  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer",
   output: unknown,
 ): Finding[] {
   if (agentId === "scout") {
@@ -630,7 +691,10 @@ function evidenceFindingsForAgentOutput(
   if (agentId === "architecture") {
     return architectureEvidenceFindings(output as ArchitectureOutput);
   }
-  return patternMinerEvidenceFindings(output as PatternMinerOutput);
+  if (agentId === "pattern_miner") {
+    return patternMinerEvidenceFindings(output as PatternMinerOutput);
+  }
+  return flowTracerEvidenceFindings(output as FlowTracerOutput);
 }
 
 function renderInitialMemorySnapshot(objective: string): string {
@@ -727,6 +791,96 @@ function patternMinerEvidenceFindings(output: PatternMinerOutput): Finding[] {
       evidence: pattern.evidence,
       recommendation: pattern.adaptationValue,
       confidence: pattern.confidence,
+    })),
+    ...output.findings,
+  ];
+}
+
+function flowTracerEvidenceFindings(output: FlowTracerOutput): Finding[] {
+  return [
+    ...output.flows.flatMap((flow, index) => [
+      {
+        id: `finding-flow-tracer-flow-${index + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: `${flow.name}: ${flow.action}`,
+        evidence: flow.evidence,
+        recommendation:
+          "Use this flow trace only where each step remains backed by cited repository evidence.",
+        confidence: 0.6,
+      },
+      {
+        id: `finding-flow-tracer-entry-${index + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: `Flow entry point: ${flow.entryPoint.path}`,
+        evidence: flow.entryPoint.evidence,
+        recommendation: "Keep entry point claims tied to the cited file range.",
+        confidence: 0.5,
+      },
+      ...flow.mainFiles.map((file, fileIndex) => ({
+        id: `finding-flow-tracer-main-file-${index + 1}-${fileIndex + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: `${file.path}: ${file.role}`,
+        evidence: file.evidence,
+        recommendation: "Treat this file role as part of the traced flow.",
+        confidence: 0.5,
+      })),
+      ...flow.dataPath.map((step, stepIndex) => ({
+        id: `finding-flow-tracer-data-path-${index + 1}-${stepIndex + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: step.step,
+        evidence: step.evidence,
+        recommendation: "Preserve this data path step only with its cited evidence.",
+        confidence: 0.5,
+      })),
+      ...flow.sideEffects.map((sideEffect, sideEffectIndex) => ({
+        id: `finding-flow-tracer-side-effect-${index + 1}-${sideEffectIndex + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: sideEffect.description,
+        evidence: sideEffect.evidence,
+        recommendation: "Keep side-effect claims bounded by visible evidence.",
+        confidence: 0.5,
+      })),
+      ...flow.persistencePath.map((persistence, persistenceIndex) => ({
+        id: `finding-flow-tracer-persistence-${index + 1}-${persistenceIndex + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: persistence.description,
+        evidence: persistence.evidence,
+        recommendation: "Use this persistence observation only as far as evidence supports it.",
+        confidence: 0.5,
+      })),
+      ...flow.errorPaths.map((errorPath, errorIndex) => ({
+        id: `finding-flow-tracer-error-${index + 1}-${errorIndex + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: errorPath.description,
+        evidence: errorPath.evidence,
+        recommendation: "Do not infer additional error paths beyond this evidence.",
+        confidence: 0.5,
+      })),
+      ...flow.tests.map((visibleTest, testIndex) => ({
+        id: `finding-flow-tracer-test-${index + 1}-${testIndex + 1}`,
+        agent: "flow_tracer",
+        severity: "info" as const,
+        claim: visibleTest.description,
+        evidence: visibleTest.evidence,
+        recommendation: "Keep test coverage claims tied to visible test evidence.",
+        confidence: 0.5,
+      })),
+    ]),
+    ...output.insufficientEvidence.map((gap, index) => ({
+      id: `finding-flow-tracer-insufficient-evidence-${index + 1}`,
+      agent: "flow_tracer",
+      severity: "info" as const,
+      claim: `${gap.topic}: ${gap.reason}`,
+      evidence: gap.evidence,
+      recommendation: "Report this as insufficient evidence rather than inventing a flow.",
+      confidence: 0.4,
     })),
     ...output.findings,
   ];

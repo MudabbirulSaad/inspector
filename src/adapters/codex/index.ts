@@ -247,8 +247,88 @@ export async function createDefaultScoutArchitectureFakeRunner(
     streamingEvents: [],
   };
 
+  const flowTracerResult: AgentRunResult = {
+    stdout: `${JSON.stringify({
+      flows: [
+        {
+          name: "Default evidence inspection flow",
+          action:
+            "The default runner traces only the repository file available as safe evidence.",
+          entryPoint: {
+            path: citedFile.path,
+            evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          },
+          mainFiles: [
+            {
+              path: citedFile.path,
+              role: "Safe cited file selected for the default inspection run.",
+              evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+            },
+          ],
+          dataPath: [
+            {
+              step: "The selected file is passed through Scout, Architecture, Pattern Miner, and Flow Tracer placeholder outputs.",
+              evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+            },
+          ],
+          sideEffects: [
+            {
+              description:
+                "The inspection runtime writes run artifacts outside the target repository.",
+              evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+            },
+          ],
+          persistencePath: [
+            {
+              description:
+                "No target-repository persistence path is visible to the default runner.",
+              evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+            },
+          ],
+          errorPaths: [
+            {
+              description:
+                "No target-repository error path is visible to the default runner.",
+              evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+            },
+          ],
+          tests: [
+            {
+              description:
+                "No target-repository test path is visible to the default runner.",
+              evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+            },
+          ],
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      insufficientEvidence: [],
+      findings: [
+        {
+          id: "finding-flow-tracer-001",
+          agent: "flow_tracer",
+          severity: "info",
+          claim:
+            "The default Flow Tracer result has only shallow repository flow evidence.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          recommendation:
+            "Configure a real agent runner before relying on feature-flow traces.",
+          confidence: 0.4,
+          validation: ["schema-valid", "evidence-valid"],
+          cardType: "flow",
+        },
+      ],
+    })}\n`,
+    stderr: "",
+    exitCode: 0,
+    startedAt: new Date(0).toISOString(),
+    completedAt: new Date(0).toISOString(),
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+
   return new FakeAgentRunner({
-    results: [scoutResult, architectureResult, patternMinerResult],
+    results: [scoutResult, architectureResult, patternMinerResult, flowTracerResult],
   });
 }
 

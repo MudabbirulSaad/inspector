@@ -40,6 +40,16 @@ use it, adaptation value, tags, and confidence. Tradeoffs are required, and
 high-confidence patterns require traceable evidence. Pattern Miner also emits
 candidate findings for downstream QA and reporting.
 
+## Flow Tracer Output
+
+`flow-tracer-output.schema.json` describes verified feature-flow traces. It
+allows up to three flows and requires each flow to include the user or system
+action, entry point, main files, data path, side effects, persistence path,
+error paths, tests, and evidence. When a flow or part of a flow is not visible,
+the output must record insufficient evidence instead of inventing behavior.
+Flow Tracer also emits candidate findings for downstream QA, final
+documentation, and flow RAG cards.
+
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required. The runtime QA verifier also writes `qa/readiness.json` with a deterministic readiness score derived from approved findings divided by total candidate findings.
@@ -124,7 +134,7 @@ declares its id, role, description, dependencies, output artifacts, output
 schema, retry policy, required/optional policy, and QA revision ownership.
 
 The required V1 agents are `scout`, `architecture`, `pattern_miner`,
-`qa_verifier`, and `final_reviewer`. Later optional agents are `flow_tracer`,
+`flow_tracer`, `qa_verifier`, and `final_reviewer`. Later optional agents are
 `testing_strategy`, `tradeoff_analyst`, and `rag_card_distiller`.
 
 ## Prompt Templates

@@ -105,13 +105,13 @@ Adapter responsibilities include:
 - The CLI `run` adapter validates local repository and objective paths, wires
   concrete filesystem, memory, validation, prompt, schema, QA artifact, final
   document writer, and runner adapters, prints user-visible progress, and calls the
-  Scout/Architecture/Pattern Miner plus QA application use case.
-- The current Scout/Architecture/Pattern Miner application use case creates the
+  Scout/Architecture/Pattern Miner/Flow Tracer plus QA application use case.
+- The current Scout/Architecture/Pattern Miner/Flow Tracer application use case creates the
   run workspace, indexes the repository, initializes memory, builds auditable
-  prompts, runs Scout before Architecture before Pattern Miner, validates
-  structured schema and cited evidence, writes runtime artifacts through ports,
-  appends candidate findings from schema-valid and evidence-valid outputs, then
-  runs deterministic QA verification. QA revision requests are grouped by owner
+  prompts, runs Scout before Architecture before Pattern Miner before Flow
+  Tracer, validates structured schema and cited evidence, writes runtime
+  artifacts through ports, appends candidate findings from schema-valid and
+  evidence-valid outputs, then runs deterministic QA verification. QA revision requests are grouped by owner
   agent, routed only to that owner as the next attempt, revalidated against the
   owner schema and evidence rules, and followed by final QA so unresolved issues
   remain visible in QA artifacts when retries are exhausted. The use case then
@@ -215,12 +215,12 @@ V1 requires these agents in deterministic order:
 - `scout`
 - `architecture`
 - `pattern_miner`
+- `flow_tracer`
 - `qa_verifier`
 - `final_reviewer`
 
 Later optional agents are registered but not required for the V1 execution set:
 
-- `flow_tracer`
 - `testing_strategy`
 - `tradeoff_analyst`
 - `rag_card_distiller`
@@ -232,6 +232,12 @@ Pattern Miner depends on validated Architecture output. Its output contract is
 `pattern-miner-output`, which records reusable patterns with the problem solved,
 implementation shape, evidence, tradeoffs, when to use, when not to use,
 adaptation value, tags, confidence, and candidate findings.
+
+Flow Tracer depends on validated Architecture and Pattern Miner output. Its
+output contract is `flow-tracer-output`, which records one to three verified
+feature flows with action, entry point, main files, data path, side effects,
+persistence path, error paths, tests, and evidence. It must report insufficient
+evidence instead of inventing unseen flows.
 
 ## Scheduler DAG
 

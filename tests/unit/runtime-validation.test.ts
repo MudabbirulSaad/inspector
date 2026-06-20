@@ -10,6 +10,7 @@ const runtimeContracts = [
   "scout-output",
   "architecture-output",
   "pattern-miner-output",
+  "flow-tracer-output",
   "finding",
   "qa-result",
   "knowledge-card",
@@ -71,6 +72,15 @@ test("runtime validators reject invalid artifacts for every agent output contrac
         {
           ...((await readExample("pattern-miner-output")).patterns as JsonObject[])[0],
           tradeoffs: [],
+        },
+      ],
+    },
+    "flow-tracer-output": {
+      ...(await readExample("flow-tracer-output")),
+      flows: [
+        {
+          ...((await readExample("flow-tracer-output")).flows as JsonObject[])[0],
+          dataPath: [],
         },
       ],
     },

@@ -60,25 +60,30 @@ unsupported or contradictory findings, creates owner-agent revision requests,
 writes QA artifacts, appends approved/rejected findings to run memory, and
 computes a deterministic readiness score. The runtime CLI slice now parses
 `inspector run`, validates repository and objective paths, wires concrete
-adapters, prints progress, and calls a Scout/Architecture/Pattern Miner plus QA
+adapters, prints progress, and calls a Scout/Architecture/Pattern Miner/Flow
+Tracer plus QA
 application use case. That use case creates a run workspace, indexes the
 repository, initializes memory, builds auditable Scout, Architecture, and
-Pattern Miner prompts, runs Scout before Architecture before Pattern Miner
-through the runner port, validates structured schemas and cited evidence, writes
-artifacts through ports, appends candidate findings from schema-valid and
+Pattern Miner prompts, then builds a Flow Tracer prompt from prior specialist
+outputs. It runs Scout before Architecture before Pattern Miner before Flow
+Tracer through the runner port, validates structured schemas and cited evidence,
+writes artifacts through ports, appends candidate findings from schema-valid and
 evidence-valid outputs, runs QA, and routes QA revision requests back only to
-the owning agent. Owner retries preserve prior attempts, include the previous
-output and QA issue in the repair prompt, revalidate schema and evidence, update
-memory, rerun QA, and leave unresolved final revision requests visible when the
-retry policy is exhausted. The final case-study writer now emits the fixed
+the owning agent. Flow Tracer uses a dedicated `flow-tracer-output` contract for
+one to three verified feature flows or explicit insufficient-evidence records.
+Owner retries preserve prior attempts, include the previous output and QA issue
+in the repair prompt, revalidate schema and evidence, update memory, rerun QA,
+and leave unresolved final revision requests visible when the retry policy is
+exhausted. The final case-study writer now emits the fixed
 `final/docs/` Markdown package from QA-approved findings only, excludes rejected
-findings, preserves file and line evidence chains, and marks unsupported
-sections with insufficient-evidence language. The RAG knowledge card writer now
-emits schema-valid `final/rag_cards/{patterns,flows,decisions,warnings}.jsonl`
-streams from QA-approved findings only, excludes rejected findings, preserves
-finding evidence references and tags, and records source repository plus
-confidence metadata. Full scheduler-driven multi-agent orchestration is still
-pending.
+findings, preserves file and line evidence chains, fills the feature-flow
+section from approved Flow Tracer findings, and marks unsupported sections with
+insufficient-evidence language. The RAG knowledge card writer now emits
+schema-valid `final/rag_cards/{patterns,flows,decisions,warnings}.jsonl` streams
+from QA-approved findings only, excludes rejected findings, preserves finding
+evidence references and tags, routes Flow Tracer findings to `flows.jsonl`, and
+records source repository plus confidence metadata. Full scheduler-driven
+multi-agent orchestration is still pending.
 
 ## Non-Goals
 

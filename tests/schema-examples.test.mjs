@@ -8,6 +8,7 @@ const contracts = [
   "evidence",
   "scout-output",
   "architecture-output",
+  "flow-tracer-output",
   "finding",
   "qa-result",
   "qa-issue",

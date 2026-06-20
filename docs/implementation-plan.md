@@ -48,7 +48,10 @@ findings, and marks unsupported sections with explicit insufficient-evidence
 language. RAG card generation now writes schema-valid JSONL streams under
 `final/rag_cards/` from QA-approved findings only, excludes rejected findings,
 preserves evidence links back to source finding ids, and carries tags plus
-optional usage, risk, and adaptation notes.
+optional usage, risk, and adaptation notes. Flow Tracer now has a dedicated
+structured output contract, required V1 registry placement, runtime CLI
+execution after Pattern Miner, evidence validation, QA inclusion, final
+feature-flow documentation, and flow-card routing.
 
 ## Fixed Milestones
 
@@ -1176,4 +1179,53 @@ git status
 
 ```bash
 feat(writers): generate RAG knowledge cards
+```
+
+### Milestone 26: Flow Tracer Agent
+
+#### Goal
+
+Add Flow Tracer Agent.
+
+#### Tasks
+
+- Promoted `flow_tracer` into the required V1 runtime registry after
+  `pattern_miner` and before `qa_verifier`.
+- Added `flow-tracer-output.schema.json` and a matching example for tracing up
+  to three verified feature flows.
+- Required each flow to include action, entry point, main files, data path,
+  side effects, persistence path, error paths, tests, and evidence.
+- Preserved the rule that agents must report insufficient evidence instead of
+  inventing flows or unseen flow details.
+- Added a Flow Tracer prompt template with evidence-backed output rules.
+- Wired the CLI runtime use case to build the Flow Tracer prompt from prior
+  Scout, Architecture, and Pattern Miner outputs, run the agent, save output,
+  validate schema, validate nested flow evidence, append candidate findings,
+  include Flow Tracer findings in QA, and route owner revisions.
+- Updated the default fake runner to emit schema-valid Flow Tracer output.
+- Rendered approved Flow Tracer findings in
+  `final/docs/03-feature-flow-traces.md` and routed Flow Tracer RAG cards to
+  `final/rag_cards/flows.jsonl`.
+
+#### TDD
+
+Added tests for registry dependency placement, flow schema/example validation,
+runtime validator support, CLI Flow Tracer prompt/output/evidence artifacts,
+schema and evidence failure paths, final feature-flow documentation inclusion,
+RAG flow-card routing, and default fake runner output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): trace verified feature flows
 ```

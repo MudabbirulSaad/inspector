@@ -147,6 +147,50 @@ export interface PatternMinerOutput {
   findings: Finding[];
 }
 
+export interface FlowTracerPathEvidence {
+  path: string;
+  evidence: Evidence[];
+}
+
+export interface FlowTracerFileRole extends FlowTracerPathEvidence {
+  role: string;
+}
+
+export interface FlowTracerStepEvidence {
+  step: string;
+  evidence: Evidence[];
+}
+
+export interface FlowTracerDescriptionEvidence {
+  description: string;
+  evidence: Evidence[];
+}
+
+export interface FlowTracerFlow {
+  name: string;
+  action: string;
+  entryPoint: FlowTracerPathEvidence;
+  mainFiles: FlowTracerFileRole[];
+  dataPath: FlowTracerStepEvidence[];
+  sideEffects: FlowTracerDescriptionEvidence[];
+  persistencePath: FlowTracerDescriptionEvidence[];
+  errorPaths: FlowTracerDescriptionEvidence[];
+  tests: FlowTracerDescriptionEvidence[];
+  evidence: Evidence[];
+}
+
+export interface FlowTracerInsufficientEvidence {
+  topic: string;
+  reason: string;
+  evidence: Evidence[];
+}
+
+export interface FlowTracerOutput {
+  flows: FlowTracerFlow[];
+  insufficientEvidence: FlowTracerInsufficientEvidence[];
+  findings: Finding[];
+}
+
 export interface QaCheck {
   name: string;
   status: QaStatus;

@@ -173,6 +173,77 @@ const patternMinerOutput = {
   findings: [patternMinerFinding],
 };
 
+const flowTracerFinding = {
+  id: "finding-flow-tracer-001",
+  agent: "flow_tracer",
+  severity: "info",
+  claim: "The visible inspection flow starts from README context and produces run artifacts.",
+  evidence: [
+    {
+      file: "README.md",
+      lineStart: 1,
+      lineEnd: 2,
+    },
+  ],
+  recommendation:
+    "Treat the README-backed flow as a shallow trace until source entrypoints are available.",
+  confidence: 0.6,
+  cardType: "flow",
+};
+
+const flowTracerOutput = {
+  flows: [
+    {
+      name: "README inspection context flow",
+      action: "User runs the inspector against a repository with README context.",
+      entryPoint: {
+        path: "README.md",
+        evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+      },
+      mainFiles: [
+        {
+          path: "README.md",
+          role: "Only visible repository context in the fixture.",
+          evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+        },
+      ],
+      dataPath: [
+        {
+          step: "README content is used as the initial repository context.",
+          evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+        },
+      ],
+      sideEffects: [
+        {
+          description: "The inspection run writes auditable artifacts.",
+          evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+        },
+      ],
+      persistencePath: [
+        {
+          description: "No repository persistence path is visible from the fixture.",
+          evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+        },
+      ],
+      errorPaths: [
+        {
+          description: "No repository error path is visible from the fixture.",
+          evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+        },
+      ],
+      tests: [
+        {
+          description: "No repository tests are visible from the fixture.",
+          evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+        },
+      ],
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  insufficientEvidence: [],
+  findings: [flowTracerFinding],
+};
+
 function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunResult {
   return {
     stdout,
@@ -213,12 +284,27 @@ function successfulPatternMinerResult(
   };
 }
 
+function successfulFlowTracerResult(
+  stdout = JSON.stringify(flowTracerOutput),
+): AgentRunResult {
+  return {
+    stdout,
+    stderr: "",
+    exitCode: 0,
+    startedAt: "2026-06-20T01:02:10.000Z",
+    completedAt: "2026-06-20T01:02:11.000Z",
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+}
+
 function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
   return new FakeAgentRunner({
     results: [
       successfulScoutResult(),
       successfulArchitectureResult(),
       successfulPatternMinerResult(),
+      successfulFlowTracerResult(),
       ...results,
     ],
   });
@@ -381,7 +467,7 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
   });
 
   assert.equal(result.exitCode, 0);
-  assert.equal(runner.requests.length, 3);
+  assert.equal(runner.requests.length, 4);
   assert.equal(runner.requests[0]?.agentId, "scout");
   assert.match(runner.requests[0]?.prompt ?? "", /Inspect the repository/);
   assert.deepEqual(
@@ -488,6 +574,35 @@ test("CLI run sends Pattern Miner a prompt containing Scout and Architecture out
   assert.match(prompt, /whenNotToUse/);
 });
 
+test("CLI run sends Flow Tracer a prompt containing prior specialist outputs", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(runner.requests[3]?.agentId, "flow_tracer");
+  const prompt = runner.requests[3]?.prompt ?? "";
+  assert.match(prompt, /# Agent Prompt: flow_tracer/);
+  assert.match(prompt, /Previous Outputs/);
+  assert.match(prompt, /layerMap/);
+  assert.match(prompt, /patterns/);
+  assert.match(prompt, /Flow Tracer Agent Output Rules/);
+  assert.match(prompt, /persistencePath/);
+});
+
 test("CLI run writes repository, memory, schema, and evidence artifacts", async () => {
   const fixture = await createFixture();
 
@@ -524,14 +639,14 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as unknown),
-    [scoutFinding, architectureFinding, patternMinerFinding],
+    [scoutFinding, architectureFinding, patternMinerFinding, flowTracerFinding],
   );
   assert.deepEqual(
     (await readFile(join(workspaceRoot, "memory", "verified_findings.jsonl"), "utf8"))
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as unknown),
-    [scoutFinding, architectureFinding, patternMinerFinding],
+    [scoutFinding, architectureFinding, patternMinerFinding, flowTracerFinding],
   );
   assert.match(
     await readFile(
@@ -543,6 +658,41 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   assert.match(
     await readFile(
       join(workspaceRoot, "validation", "scout", "attempt-1", "evidence.json"),
+      "utf8",
+    ),
+    /"valid": true/,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "flow_tracer", "attempt-1", "output.json"),
+        "utf8",
+      ),
+    ),
+    flowTracerOutput,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "flow_tracer",
+        "attempt-1",
+        "report.json",
+      ),
+      "utf8",
+    ),
+    /"contract": "flow-tracer-output"/,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "flow_tracer",
+        "attempt-1",
+        "evidence.json",
+      ),
       "utf8",
     ),
     /"valid": true/,
@@ -619,7 +769,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "results.json"), "utf8"))
       .length,
-    3,
+    4,
   );
   assert.match(
     await readFile(
@@ -633,7 +783,14 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       join(workspaceRoot, "final", "docs", "09-verification-report.md"),
       "utf8",
     ),
-    /Approved findings used: 3/,
+    /Approved findings used: 4/,
+  );
+  assert.match(
+    await readFile(
+      join(workspaceRoot, "final", "docs", "03-feature-flow-traces.md"),
+      "utf8",
+    ),
+    /The visible inspection flow starts from README context/,
   );
   const patternCards = await readFile(
     join(workspaceRoot, "final", "rag_cards", "patterns.jsonl"),
@@ -647,10 +804,15 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
     join(workspaceRoot, "final", "rag_cards", "decisions.jsonl"),
     "utf8",
   );
+  const flowCards = await readFile(
+    join(workspaceRoot, "final", "rag_cards", "flows.jsonl"),
+    "utf8",
+  );
 
   assert.match(patternCards, /rag-card-finding-pattern-miner-001/);
   assert.match(warningCards, /rag-card-finding-architecture-001/);
   assert.match(decisionCards, /rag-card-finding-scout-001/);
+  assert.match(flowCards, /rag-card-finding-flow-tracer-001/);
   assert.equal(
     JSON.parse(patternCards.trim().split("\n")[0] ?? "{}").sourceRepo,
     "target-repo",
@@ -689,6 +851,7 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
       successfulScoutResult(),
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
       successfulPatternMinerResult(),
+      successfulFlowTracerResult(),
       successfulArchitectureResult(JSON.stringify(repairedArchitectureOutput)),
     ],
   });
@@ -714,6 +877,7 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
       ["scout", 1],
       ["architecture", 1],
       ["pattern_miner", 1],
+      ["flow_tracer", 1],
       ["architecture", 2],
     ],
   );
@@ -801,6 +965,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
       successfulScoutResult(),
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
       successfulPatternMinerResult(),
+      successfulFlowTracerResult(),
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
     ],
   });
@@ -826,6 +991,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
       ["scout", 1],
       ["architecture", 1],
       ["pattern_miner", 1],
+      ["flow_tracer", 1],
       ["architecture", 2],
     ],
   );
@@ -850,7 +1016,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
       .readinessScore,
-    50,
+    60,
   );
   assert.match(
     await readFile(join(workspaceRoot, "memory", "qa_issues.jsonl"), "utf8"),
@@ -878,6 +1044,7 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
         successfulScoutResult(JSON.stringify(scoutOutput)),
         successfulArchitectureResult(JSON.stringify(architectureOutput)),
         successfulPatternMinerResult(JSON.stringify(patternMinerOutput)),
+        successfulFlowTracerResult(JSON.stringify(flowTracerOutput)),
       ].map((agentResult) => ({
         ...agentResult,
         streamingEvents: [
@@ -900,6 +1067,8 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.match(stdout.join("\n"), /\[architecture:status\] Scout started/);
   assert.match(stdout.join("\n"), /Running Pattern Miner/);
   assert.match(stdout.join("\n"), /\[pattern_miner:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Running Flow Tracer/);
+  assert.match(stdout.join("\n"), /\[flow_tracer:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
 });
 
@@ -1099,4 +1268,78 @@ test("CLI run fails when Pattern Miner evidence cites missing repository lines",
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Pattern Miner evidence validation failed/);
+});
+
+test("CLI run fails when Flow Tracer output omits required flow fields", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidFlowOutput = {
+    ...flowTracerOutput,
+    flows: [{ ...flowTracerOutput.flows[0], dataPath: [] }],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(JSON.stringify(invalidFlowOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Flow Tracer schema validation failed/);
+  assert.match(stderr.join("\n"), /dataPath/);
+});
+
+test("CLI run fails when Flow Tracer evidence cites missing repository lines", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidFlowOutput = {
+    ...flowTracerOutput,
+    flows: [
+      {
+        ...flowTracerOutput.flows[0],
+        evidence: [{ file: "README.md", lineStart: 99, lineEnd: 100 }],
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(JSON.stringify(invalidFlowOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Flow Tracer evidence validation failed/);
 });

@@ -56,7 +56,7 @@ const documentSpecs: CaseStudyDocumentSpec[] = [
   {
     path: "03-feature-flow-traces.md",
     title: "Feature Flow Traces",
-    body: renderUnsupportedSection,
+    body: (input) => renderFindingsSection(input, "flow_tracer"),
   },
   {
     path: "04-pattern-catalog.md",

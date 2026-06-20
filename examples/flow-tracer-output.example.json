@@ -1,0 +1,118 @@
+{
+  "flows": [
+    {
+      "name": "CLI inspection run",
+      "action": "User runs the inspector CLI against a target repository.",
+      "entryPoint": {
+        "path": "src/adapters/cli/index.ts",
+        "evidence": [
+          {
+            "file": "src/adapters/cli/index.ts",
+            "lineStart": 1,
+            "lineEnd": 20
+          }
+        ]
+      },
+      "mainFiles": [
+        {
+          "path": "src/application/run-scout-architecture-inspection.ts",
+          "role": "Coordinates the inspection run after CLI input is parsed.",
+          "evidence": [
+            {
+              "file": "src/application/run-scout-architecture-inspection.ts",
+              "lineStart": 1,
+              "lineEnd": 20
+            }
+          ]
+        }
+      ],
+      "dataPath": [
+        {
+          "step": "The CLI builds run configuration and passes it to the inspection use case.",
+          "evidence": [
+            {
+              "file": "src/adapters/cli/index.ts",
+              "lineStart": 1,
+              "lineEnd": 20
+            }
+          ]
+        }
+      ],
+      "sideEffects": [
+        {
+          "description": "The run creates workspace artifacts for repository index, memory, agents, validation, QA, and final output.",
+          "evidence": [
+            {
+              "file": "src/application/run-scout-architecture-inspection.ts",
+              "lineStart": 1,
+              "lineEnd": 20
+            }
+          ]
+        }
+      ],
+      "persistencePath": [
+        {
+          "description": "Run artifacts are persisted under the configured inspection workspace.",
+          "evidence": [
+            {
+              "file": "src/application/run-scout-architecture-inspection.ts",
+              "lineStart": 1,
+              "lineEnd": 20
+            }
+          ]
+        }
+      ],
+      "errorPaths": [
+        {
+          "description": "Schema or evidence validation failures stop the run before final output is written.",
+          "evidence": [
+            {
+              "file": "src/application/run-scout-architecture-inspection.ts",
+              "lineStart": 1,
+              "lineEnd": 20
+            }
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "description": "CLI integration tests exercise the run workflow.",
+          "evidence": [
+            {
+              "file": "tests/integration/cli-run.test.ts",
+              "lineStart": 1,
+              "lineEnd": 20
+            }
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "file": "src/adapters/cli/index.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "insufficientEvidence": [],
+  "findings": [
+    {
+      "id": "finding-flow-tracer-001",
+      "agent": "flow_tracer",
+      "severity": "info",
+      "claim": "The CLI inspection run is traceable from CLI input to persisted run artifacts.",
+      "evidence": [
+        {
+          "file": "src/adapters/cli/index.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ],
+      "recommendation": "Keep CLI orchestration traceable through application ports and workspace artifacts.",
+      "confidence": 0.8,
+      "cardType": "flow",
+      "tags": ["flow", "cli"]
+    }
+  ]
+}

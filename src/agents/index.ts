@@ -83,18 +83,31 @@ const agentContracts = [
     qaRevisionOwnership: { ownsRevisionFor: ["pattern_miner"] },
   },
   {
+    id: "flow_tracer",
+    role: "flow tracer",
+    description:
+      "Traces user-facing flows through entrypoints, services, adapters, and output artifacts.",
+    lifecycle: "v1",
+    dependencies: ["architecture", "pattern_miner"],
+    outputArtifacts: ["agents/flow_tracer/attempt-{attempt}/output.json"],
+    outputSchema: "flow-tracer-output",
+    retryPolicy: defaultRetryPolicy,
+    required: true,
+    qaRevisionOwnership: { ownsRevisionFor: ["flow_tracer"] },
+  },
+  {
     id: "qa_verifier",
     role: "QA verifier",
     description:
       "Checks validated findings for evidence quality, accuracy, and follow-up requirements.",
     lifecycle: "v1",
-    dependencies: ["architecture", "pattern_miner"],
+    dependencies: ["architecture", "pattern_miner", "flow_tracer"],
     outputArtifacts: ["qa/results.json"],
     outputSchema: "qa-result",
     retryPolicy: defaultRetryPolicy,
     required: true,
     qaRevisionOwnership: {
-      ownsRevisionFor: ["scout", "architecture", "pattern_miner"],
+      ownsRevisionFor: ["scout", "architecture", "pattern_miner", "flow_tracer"],
     },
   },
   {
@@ -109,19 +122,6 @@ const agentContracts = [
     retryPolicy: defaultRetryPolicy,
     required: true,
     qaRevisionOwnership: { ownsRevisionFor: [] },
-  },
-  {
-    id: "flow_tracer",
-    role: "flow tracer",
-    description:
-      "Traces user-facing flows through entrypoints, services, adapters, and output artifacts.",
-    lifecycle: "later",
-    dependencies: ["scout", "architecture"],
-    outputArtifacts: ["agents/flow_tracer/findings.json"],
-    outputSchema: "finding",
-    retryPolicy: defaultRetryPolicy,
-    required: false,
-    qaRevisionOwnership: { ownsRevisionFor: ["flow_tracer"] },
   },
   {
     id: "testing_strategy",

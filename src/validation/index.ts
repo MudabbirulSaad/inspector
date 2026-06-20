@@ -5,6 +5,7 @@ import addFormats from "ajv-formats/dist/index.js";
 
 import type {
   Finding,
+  FlowTracerOutput,
   ArchitectureOutput,
   InspectionReport,
   KnowledgeCard,
@@ -21,6 +22,7 @@ export type SchemaContractName =
   | "scout-output"
   | "architecture-output"
   | "pattern-miner-output"
+  | "flow-tracer-output"
   | "finding"
   | "qa-result"
   | "knowledge-card"
@@ -48,6 +50,7 @@ export interface SchemaContractValidators {
   "scout-output": ContractValidator<ScoutOutput>;
   "architecture-output": ContractValidator<ArchitectureOutput>;
   "pattern-miner-output": ContractValidator<PatternMinerOutput>;
+  "flow-tracer-output": ContractValidator<FlowTracerOutput>;
   finding: ContractValidator<Finding>;
   "qa-result": ContractValidator<QaResult>;
   "knowledge-card": ContractValidator<KnowledgeCard>;
@@ -61,6 +64,7 @@ const schemaContracts = [
   "scout-output",
   "architecture-output",
   "pattern-miner-output",
+  "flow-tracer-output",
   "finding",
   "qa-result",
   "qa-issue",
@@ -78,6 +82,7 @@ const contractTitles: Record<SchemaContractName, string> = {
   "scout-output": "Scout output",
   "architecture-output": "Architecture output",
   "pattern-miner-output": "Pattern Miner output",
+  "flow-tracer-output": "Flow Tracer output",
   finding: "Finding",
   "qa-result": "QA result",
   "knowledge-card": "Knowledge card",
@@ -113,6 +118,11 @@ export async function createSchemaContractValidators(
       ajv,
       schemas,
       "pattern-miner-output",
+    ),
+    "flow-tracer-output": createValidator<FlowTracerOutput>(
+      ajv,
+      schemas,
+      "flow-tracer-output",
     ),
     finding: createValidator<Finding>(ajv, schemas, "finding"),
     "qa-result": createValidator<QaResult>(ajv, schemas, "qa-result"),
