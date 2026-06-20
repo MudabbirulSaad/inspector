@@ -66,7 +66,7 @@ const documentSpecs: CaseStudyDocumentSpec[] = [
   {
     path: "05-testing-strategy.md",
     title: "Testing Strategy",
-    body: renderUnsupportedSection,
+    body: (input) => renderFindingsSection(input, "testing_strategy"),
   },
   {
     path: "06-tradeoffs-and-risks.md",
@@ -242,10 +242,6 @@ function renderVerificationReport(
           })
           .join("\n"),
   ].join("\n");
-}
-
-function renderUnsupportedSection(): string {
-  return unsupported;
 }
 
 function renderFindingList(findings: Finding[]): string {

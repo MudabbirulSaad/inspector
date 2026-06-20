@@ -14,6 +14,7 @@ import type {
   QaIssue,
   QaResult,
   ScoutOutput,
+  TestingStrategyOutput,
 } from "../domain/types.js";
 
 export const validationBoundary = "validation" as const;
@@ -23,6 +24,7 @@ export type SchemaContractName =
   | "architecture-output"
   | "pattern-miner-output"
   | "flow-tracer-output"
+  | "testing-strategy-output"
   | "finding"
   | "qa-result"
   | "knowledge-card"
@@ -51,6 +53,7 @@ export interface SchemaContractValidators {
   "architecture-output": ContractValidator<ArchitectureOutput>;
   "pattern-miner-output": ContractValidator<PatternMinerOutput>;
   "flow-tracer-output": ContractValidator<FlowTracerOutput>;
+  "testing-strategy-output": ContractValidator<TestingStrategyOutput>;
   finding: ContractValidator<Finding>;
   "qa-result": ContractValidator<QaResult>;
   "knowledge-card": ContractValidator<KnowledgeCard>;
@@ -65,6 +68,7 @@ const schemaContracts = [
   "architecture-output",
   "pattern-miner-output",
   "flow-tracer-output",
+  "testing-strategy-output",
   "finding",
   "qa-result",
   "qa-issue",
@@ -83,6 +87,7 @@ const contractTitles: Record<SchemaContractName, string> = {
   "architecture-output": "Architecture output",
   "pattern-miner-output": "Pattern Miner output",
   "flow-tracer-output": "Flow Tracer output",
+  "testing-strategy-output": "Testing Strategy output",
   finding: "Finding",
   "qa-result": "QA result",
   "knowledge-card": "Knowledge card",
@@ -123,6 +128,11 @@ export async function createSchemaContractValidators(
       ajv,
       schemas,
       "flow-tracer-output",
+    ),
+    "testing-strategy-output": createValidator<TestingStrategyOutput>(
+      ajv,
+      schemas,
+      "testing-strategy-output",
     ),
     finding: createValidator<Finding>(ajv, schemas, "finding"),
     "qa-result": createValidator<QaResult>(ajv, schemas, "qa-result"),

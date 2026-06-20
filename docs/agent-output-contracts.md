@@ -50,6 +50,16 @@ the output must record insufficient evidence instead of inventing behavior.
 Flow Tracer also emits candidate findings for downstream QA, final
 documentation, and flow RAG cards.
 
+## Testing Strategy Output
+
+`testing-strategy-output.schema.json` describes the Testing Strategy agent's
+testing and quality-gate assessment. It records test types found, quality gates,
+behavior protected by existing tests, behavior not protected, command evidence,
+testing risks, recommendations, and candidate findings. Command status must be
+`passed`, `failed`, or `not-run`; passed command evidence requires an exit code
+and run timestamp, and the application validator rejects passed quality-gate
+claims unless matching passed command evidence exists.
+
 ## QA Result
 
 `qa-result.schema.json` describes validation of a finding. It records the QA agent, target finding, status, rationale, checks performed, and whether follow-up is required. The runtime QA verifier also writes `qa/readiness.json` with a deterministic readiness score derived from approved findings divided by total candidate findings.
@@ -97,9 +107,10 @@ aligned with these schemas.
 
 The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
-validators for Scout output, Architecture output, findings, QA results,
-Pattern Miner output, knowledge cards, memory events, QA issues, and
-inspection reports without duplicating schema definitions in TypeScript.
+validators for Scout output, Architecture output, Pattern Miner output, Flow
+Tracer output, Testing Strategy output, findings, QA results, knowledge cards,
+memory events, QA issues, and inspection reports without duplicating schema
+definitions in TypeScript.
 
 ## Agent Output Validation
 
@@ -134,8 +145,8 @@ declares its id, role, description, dependencies, output artifacts, output
 schema, retry policy, required/optional policy, and QA revision ownership.
 
 The required V1 agents are `scout`, `architecture`, `pattern_miner`,
-`flow_tracer`, `qa_verifier`, and `final_reviewer`. Later optional agents are
-`testing_strategy`, `tradeoff_analyst`, and `rag_card_distiller`.
+`flow_tracer`, `testing_strategy`, `qa_verifier`, and `final_reviewer`. Later
+optional agents are `tradeoff_analyst` and `rag_card_distiller`.
 
 ## Prompt Templates
 

@@ -1,0 +1,124 @@
+{
+  "$id": "testing-strategy-output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Testing Strategy output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "testTypesFound",
+    "qualityGates",
+    "behaviorProtected",
+    "behaviorNotProtected",
+    "commandEvidence",
+    "testingRisks",
+    "recommendations",
+    "findings"
+  ],
+  "properties": {
+    "testTypesFound": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceNote" }
+    },
+    "qualityGates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/qualityGate" }
+    },
+    "behaviorProtected": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceNote" }
+    },
+    "behaviorNotProtected": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceNote" }
+    },
+    "commandEvidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/commandEvidence" }
+    },
+    "testingRisks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceNote" }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/recommendation" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    }
+  },
+  "$defs": {
+    "evidenceNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "summary", "evidence"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        }
+      }
+    },
+    "qualityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "status", "summary", "evidence"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed", "not-run"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        }
+      }
+    },
+    "commandEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "status", "evidence"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed", "not-run"] },
+        "exitCode": { "type": "integer" },
+        "ranAt": { "type": "string", "format": "date-time" },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "passed" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["exitCode", "ranAt"],
+            "properties": { "exitCode": { "const": 0 } }
+          }
+        }
+      ]
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "priority", "evidence"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["low", "medium", "high"] },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "evidence.schema.json" }
+        }
+      }
+    }
+  }
+}

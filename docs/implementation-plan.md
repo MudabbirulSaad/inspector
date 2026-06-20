@@ -1229,3 +1229,52 @@ git status
 ```bash
 feat(agents): trace verified feature flows
 ```
+
+### Milestone 27: Testing Strategy Agent
+
+#### Goal
+
+Add Testing Strategy Agent.
+
+#### Tasks
+
+- Promoted `testing_strategy` into the required V1 runtime registry after
+  `flow_tracer` and before `qa_verifier`.
+- Added `testing-strategy-output.schema.json` and a matching example for test
+  types found, quality gates, protected behavior, unprotected behavior, command
+  evidence, testing risks, recommendations, and findings.
+- Added executable claim validation so a passed quality gate is rejected unless
+  matching command evidence records the command as passed.
+- Added a Testing Strategy prompt template that requires file/line evidence and
+  forbids claiming tests passed unless commands actually ran.
+- Wired the CLI runtime use case to build the Testing Strategy prompt from
+  prior specialist outputs, run the agent, save output, validate schema,
+  validate nested evidence, append candidate findings, include findings in QA,
+  and route owner revisions.
+- Updated the default fake runner to emit schema-valid Testing Strategy output
+  with validation commands marked `not-run`.
+- Rendered approved Testing Strategy findings in
+  `final/docs/05-testing-strategy.md`.
+
+#### TDD
+
+Added tests for registry dependency placement, schema/example validation,
+runtime validator support, command-evidence claim validation, CLI Testing
+Strategy prompt/output/evidence artifacts, schema and evidence failure paths,
+and final testing-strategy documentation inclusion.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): inspect repository testing strategy
+```

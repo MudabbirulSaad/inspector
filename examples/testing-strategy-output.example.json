@@ -1,0 +1,114 @@
+{
+  "testTypesFound": [
+    {
+      "name": "Integration tests",
+      "summary": "The repository has integration tests for CLI and application workflows.",
+      "evidence": [
+        {
+          "file": "tests/integration/cli-run.test.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "qualityGates": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "summary": "The test command is available and passed when run.",
+      "evidence": [
+        {
+          "file": "package.json",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "behaviorProtected": [
+    {
+      "name": "CLI run workflow",
+      "summary": "The CLI integration suite protects the user-visible run workflow.",
+      "evidence": [
+        {
+          "file": "tests/integration/cli-run.test.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "behaviorNotProtected": [
+    {
+      "name": "Live external agent execution",
+      "summary": "The visible tests use deterministic fake runners instead of a live Codex process.",
+      "evidence": [
+        {
+          "file": "tests/integration/agent-runner.test.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "commandEvidence": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "exitCode": 0,
+      "ranAt": "2026-06-20T01:02:03.004Z",
+      "evidence": [
+        {
+          "file": "package.json",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "testingRisks": [
+    {
+      "name": "External runner confidence",
+      "summary": "Live AI runner behavior still needs explicit environment-backed validation before production use.",
+      "evidence": [
+        {
+          "file": "src/adapters/codex/index.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "recommendations": [
+    {
+      "summary": "Keep adding behavior-level integration tests around new orchestration agents.",
+      "priority": "high",
+      "evidence": [
+        {
+          "file": "docs/testing-strategy.md",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-testing-strategy-001",
+      "agent": "testing_strategy",
+      "severity": "medium",
+      "claim": "The repository protects CLI orchestration behavior with integration tests while live external runner validation remains a risk.",
+      "evidence": [
+        {
+          "file": "tests/integration/cli-run.test.ts",
+          "lineStart": 1,
+          "lineEnd": 20
+        }
+      ],
+      "recommendation": "Add explicit live-runner validation before depending on external agent execution in production reports.",
+      "confidence": 0.8,
+      "tags": ["testing", "quality-gate"]
+    }
+  ]
+}

@@ -327,8 +327,96 @@ export async function createDefaultScoutArchitectureFakeRunner(
     streamingEvents: [],
   };
 
+  const testingStrategyResult: AgentRunResult = {
+    stdout: `${JSON.stringify({
+      testTypesFound: [
+        {
+          name: "Default runner testing evidence",
+          summary:
+            "The default runner only confirms that a repository file is available for testing-strategy inspection.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      qualityGates: [
+        {
+          command: "npm test",
+          status: "not-run",
+          summary:
+            "The default runner does not execute repository validation commands.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      behaviorProtected: [
+        {
+          name: "Default inspection path",
+          summary:
+            "Only the deterministic placeholder inspection path is represented by the default runner.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      behaviorNotProtected: [
+        {
+          name: "Real repository test outcomes",
+          summary:
+            "No target-repository test outcome is proven because no validation command was run.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      commandEvidence: [
+        {
+          command: "npm test",
+          status: "not-run",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      testingRisks: [
+        {
+          name: "Unexecuted validation commands",
+          summary:
+            "Default output must not be treated as evidence that repository tests pass.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      recommendations: [
+        {
+          summary:
+            "Run the repository validation commands before claiming quality gates pass.",
+          priority: "high",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+        },
+      ],
+      findings: [
+        {
+          id: "finding-testing-strategy-001",
+          agent: "testing_strategy",
+          severity: "medium",
+          claim:
+            "The default Testing Strategy result does not prove repository tests pass.",
+          evidence: [{ file: citedFile.path, lineStart: 1, lineEnd }],
+          recommendation:
+            "Configure a real agent runner and run validation commands before relying on testing findings.",
+          confidence: 0.4,
+          validation: ["schema-valid", "evidence-valid"],
+          tags: ["testing", "quality-gate"],
+        },
+      ],
+    })}\n`,
+    stderr: "",
+    exitCode: 0,
+    startedAt: new Date(0).toISOString(),
+    completedAt: new Date(0).toISOString(),
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+
   return new FakeAgentRunner({
-    results: [scoutResult, architectureResult, patternMinerResult, flowTracerResult],
+    results: [
+      scoutResult,
+      architectureResult,
+      patternMinerResult,
+      flowTracerResult,
+      testingStrategyResult,
+    ],
   });
 }
 

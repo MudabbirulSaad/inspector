@@ -244,6 +244,78 @@ const flowTracerOutput = {
   findings: [flowTracerFinding],
 };
 
+const testingStrategyFinding = {
+  id: "finding-testing-strategy-001",
+  agent: "testing_strategy",
+  severity: "medium",
+  claim: "The fixture protects CLI behavior with integration tests but does not prove live runner behavior.",
+  evidence: [
+    {
+      file: "README.md",
+      lineStart: 1,
+      lineEnd: 2,
+    },
+  ],
+  recommendation:
+    "Keep live runner validation separate from deterministic fake-runner tests.",
+  confidence: 0.7,
+  tags: ["testing", "quality-gate"],
+};
+
+const testingStrategyOutput = {
+  testTypesFound: [
+    {
+      name: "Fixture integration coverage",
+      summary: "The fixture evidence supports only shallow integration-test claims.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  qualityGates: [
+    {
+      command: "npm test",
+      status: "not-run",
+      summary: "The agent observed the configured test command but did not run it.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  behaviorProtected: [
+    {
+      name: "CLI fixture path",
+      summary: "The fixture protects the CLI happy path through deterministic output.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  behaviorNotProtected: [
+    {
+      name: "Live Codex runner",
+      summary: "No fixture evidence proves live external runner behavior.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  commandEvidence: [
+    {
+      command: "npm test",
+      status: "not-run",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  testingRisks: [
+    {
+      name: "Unproven live runner",
+      summary: "Fake-runner confidence does not prove live external process behavior.",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  recommendations: [
+    {
+      summary: "Run validation commands before claiming repository tests pass.",
+      priority: "high",
+      evidence: [{ file: "README.md", lineStart: 1, lineEnd: 2 }],
+    },
+  ],
+  findings: [testingStrategyFinding],
+};
+
 function successfulScoutResult(stdout = JSON.stringify(scoutOutput)): AgentRunResult {
   return {
     stdout,
@@ -298,6 +370,20 @@ function successfulFlowTracerResult(
   };
 }
 
+function successfulTestingStrategyResult(
+  stdout = JSON.stringify(testingStrategyOutput),
+): AgentRunResult {
+  return {
+    stdout,
+    stderr: "",
+    exitCode: 0,
+    startedAt: "2026-06-20T01:02:12.000Z",
+    completedAt: "2026-06-20T01:02:13.000Z",
+    outputArtifactPaths: [],
+    streamingEvents: [],
+  };
+}
+
 function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
   return new FakeAgentRunner({
     results: [
@@ -305,6 +391,7 @@ function successfulRunner(results: AgentRunResult[] = []): FakeAgentRunner {
       successfulArchitectureResult(),
       successfulPatternMinerResult(),
       successfulFlowTracerResult(),
+      successfulTestingStrategyResult(),
       ...results,
     ],
   });
@@ -467,7 +554,7 @@ test("CLI run sends the objective to the fake Scout runner and saves Scout outpu
   });
 
   assert.equal(result.exitCode, 0);
-  assert.equal(runner.requests.length, 4);
+  assert.equal(runner.requests.length, 5);
   assert.equal(runner.requests[0]?.agentId, "scout");
   assert.match(runner.requests[0]?.prompt ?? "", /Inspect the repository/);
   assert.deepEqual(
@@ -603,6 +690,35 @@ test("CLI run sends Flow Tracer a prompt containing prior specialist outputs", a
   assert.match(prompt, /persistencePath/);
 });
 
+test("CLI run sends Testing Strategy a prompt containing prior specialist outputs", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunner();
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(runner.requests[4]?.agentId, "testing_strategy");
+  const prompt = runner.requests[4]?.prompt ?? "";
+  assert.match(prompt, /# Agent Prompt: testing_strategy/);
+  assert.match(prompt, /Previous Outputs/);
+  assert.match(prompt, /patterns/);
+  assert.match(prompt, /flows/);
+  assert.match(prompt, /Testing Strategy Agent Output Rules/);
+  assert.match(prompt, /commandEvidence/);
+});
+
 test("CLI run writes repository, memory, schema, and evidence artifacts", async () => {
   const fixture = await createFixture();
 
@@ -639,14 +755,26 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as unknown),
-    [scoutFinding, architectureFinding, patternMinerFinding, flowTracerFinding],
+    [
+      scoutFinding,
+      architectureFinding,
+      patternMinerFinding,
+      flowTracerFinding,
+      testingStrategyFinding,
+    ],
   );
   assert.deepEqual(
     (await readFile(join(workspaceRoot, "memory", "verified_findings.jsonl"), "utf8"))
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as unknown),
-    [scoutFinding, architectureFinding, patternMinerFinding, flowTracerFinding],
+    [
+      scoutFinding,
+      architectureFinding,
+      patternMinerFinding,
+      flowTracerFinding,
+      testingStrategyFinding,
+    ],
   );
   assert.match(
     await readFile(
@@ -761,6 +889,41 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
     ),
     /"valid": true/,
   );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "testing_strategy", "attempt-1", "output.json"),
+        "utf8",
+      ),
+    ),
+    testingStrategyOutput,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "testing_strategy",
+        "attempt-1",
+        "report.json",
+      ),
+      "utf8",
+    ),
+    /"contract": "testing-strategy-output"/,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "testing_strategy",
+        "attempt-1",
+        "evidence.json",
+      ),
+      "utf8",
+    ),
+    /"valid": true/,
+  );
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
       .readinessScore,
@@ -769,7 +932,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "results.json"), "utf8"))
       .length,
-    4,
+    5,
   );
   assert.match(
     await readFile(
@@ -783,7 +946,7 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       join(workspaceRoot, "final", "docs", "09-verification-report.md"),
       "utf8",
     ),
-    /Approved findings used: 4/,
+    /Approved findings used: 5/,
   );
   assert.match(
     await readFile(
@@ -791,6 +954,13 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
       "utf8",
     ),
     /The visible inspection flow starts from README context/,
+  );
+  assert.match(
+    await readFile(
+      join(workspaceRoot, "final", "docs", "05-testing-strategy.md"),
+      "utf8",
+    ),
+    /fixture protects CLI behavior/,
   );
   const patternCards = await readFile(
     join(workspaceRoot, "final", "rag_cards", "patterns.jsonl"),
@@ -852,6 +1022,7 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
       successfulPatternMinerResult(),
       successfulFlowTracerResult(),
+      successfulTestingStrategyResult(),
       successfulArchitectureResult(JSON.stringify(repairedArchitectureOutput)),
     ],
   });
@@ -878,6 +1049,7 @@ test("CLI run routes QA revisions only to the owner agent and preserves attempts
       ["architecture", 1],
       ["pattern_miner", 1],
       ["flow_tracer", 1],
+      ["testing_strategy", 1],
       ["architecture", 2],
     ],
   );
@@ -966,6 +1138,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
       successfulPatternMinerResult(),
       successfulFlowTracerResult(),
+      successfulTestingStrategyResult(),
       successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
     ],
   });
@@ -992,6 +1165,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
       ["architecture", 1],
       ["pattern_miner", 1],
       ["flow_tracer", 1],
+      ["testing_strategy", 1],
       ["architecture", 2],
     ],
   );
@@ -1016,7 +1190,7 @@ test("CLI run respects max retries and leaves unresolved QA issues visible", asy
   assert.equal(
     JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
       .readinessScore,
-    60,
+    67,
   );
   assert.match(
     await readFile(join(workspaceRoot, "memory", "qa_issues.jsonl"), "utf8"),
@@ -1045,6 +1219,7 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
         successfulArchitectureResult(JSON.stringify(architectureOutput)),
         successfulPatternMinerResult(JSON.stringify(patternMinerOutput)),
         successfulFlowTracerResult(JSON.stringify(flowTracerOutput)),
+        successfulTestingStrategyResult(JSON.stringify(testingStrategyOutput)),
       ].map((agentResult) => ({
         ...agentResult,
         streamingEvents: [
@@ -1069,6 +1244,8 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   assert.match(stdout.join("\n"), /\[pattern_miner:status\] Scout started/);
   assert.match(stdout.join("\n"), /Running Flow Tracer/);
   assert.match(stdout.join("\n"), /\[flow_tracer:status\] Scout started/);
+  assert.match(stdout.join("\n"), /Running Testing Strategy/);
+  assert.match(stdout.join("\n"), /\[testing_strategy:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
 });
 
@@ -1342,4 +1519,85 @@ test("CLI run fails when Flow Tracer evidence cites missing repository lines", a
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Flow Tracer evidence validation failed/);
+});
+
+test("CLI run fails when Testing Strategy claims a passed gate without passed command evidence", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidTestingStrategyOutput = {
+    ...testingStrategyOutput,
+    qualityGates: [
+      {
+        ...testingStrategyOutput.qualityGates[0],
+        status: "passed",
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(),
+        successfulTestingStrategyResult(JSON.stringify(invalidTestingStrategyOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Testing Strategy schema validation failed/);
+  assert.match(stderr.join("\n"), /claims npm test passed without passed command evidence/);
+});
+
+test("CLI run fails when Testing Strategy evidence cites missing repository lines", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+  const invalidTestingStrategyOutput = {
+    ...testingStrategyOutput,
+    testingRisks: [
+      {
+        ...testingStrategyOutput.testingRisks[0],
+        evidence: [{ file: "README.md", lineStart: 99, lineEnd: 100 }],
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(),
+        successfulTestingStrategyResult(JSON.stringify(invalidTestingStrategyOutput)),
+      ],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Testing Strategy evidence validation failed/);
 });

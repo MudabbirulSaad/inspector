@@ -140,6 +140,35 @@ test("agent output validator uses the selected agent contract rather than the ou
   assert.match(reports.writes[0]?.content ?? "", /"contract": "qa-result"/);
 });
 
+test("agent output validator rejects Testing Strategy passed gates without passed command evidence", async () => {
+  const reports = new InMemoryValidationReports();
+  const output = await readExampleObject("testing-strategy-output");
+  output.commandEvidence = [
+    {
+      command: "npm test",
+      status: "not-run",
+      evidence: [{ file: "package.json", lineStart: 1, lineEnd: 12 }],
+    },
+  ];
+
+  const result = await validateAgentOutput({
+    workspace,
+    agent: getAgentContract("testing_strategy"),
+    attempt: 1,
+    rawOutput: JSON.stringify(output),
+    validators: await createSchemaContractValidators(),
+    reports,
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.status, "schema-invalid");
+  assert.match(
+    result.errors.map((error) => error.message).join("\n"),
+    /claims npm test passed without passed command evidence/,
+  );
+  assert.match(reports.writes[0]?.content ?? "", /npm test/);
+});
+
 test("filesystem validation report writer saves reports under the validation workspace folder", async () => {
   const root = await mkdtemp(join(tmpdir(), "inspector-validation-report-"));
   const filesystemWorkspace: RunWorkspace = {

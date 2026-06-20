@@ -191,6 +191,46 @@ export interface FlowTracerOutput {
   findings: Finding[];
 }
 
+export interface TestingStrategyEvidenceNote {
+  name: string;
+  summary: string;
+  evidence: Evidence[];
+}
+
+export type TestingStrategyCommandStatus = "passed" | "failed" | "not-run";
+
+export interface TestingStrategyQualityGate {
+  command: string;
+  status: TestingStrategyCommandStatus;
+  summary: string;
+  evidence: Evidence[];
+}
+
+export interface TestingStrategyCommandEvidence {
+  command: string;
+  status: TestingStrategyCommandStatus;
+  exitCode?: number;
+  ranAt?: string;
+  evidence: Evidence[];
+}
+
+export interface TestingStrategyRecommendation {
+  summary: string;
+  priority: "low" | "medium" | "high";
+  evidence: Evidence[];
+}
+
+export interface TestingStrategyOutput {
+  testTypesFound: TestingStrategyEvidenceNote[];
+  qualityGates: TestingStrategyQualityGate[];
+  behaviorProtected: TestingStrategyEvidenceNote[];
+  behaviorNotProtected: TestingStrategyEvidenceNote[];
+  commandEvidence: TestingStrategyCommandEvidence[];
+  testingRisks: TestingStrategyEvidenceNote[];
+  recommendations: TestingStrategyRecommendation[];
+  findings: Finding[];
+}
+
 export interface QaCheck {
   name: string;
   status: QaStatus;

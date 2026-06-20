@@ -8,6 +8,7 @@ import type {
   ContractValidationError,
   SchemaContractValidators,
 } from "../validation/index.js";
+import type { TestingStrategyOutput } from "../domain/types.js";
 
 export type AgentOutputValidationStatus =
   | "passed"
@@ -78,6 +79,17 @@ export async function validateAgentOutput(
     });
   }
 
+  const claimErrors = validateContractClaims(contract, schemaResult.value);
+  if (claimErrors.length > 0) {
+    return writeResult(request, {
+      contract,
+      status: "schema-invalid",
+      valid: false,
+      value: parsed.value,
+      errors: claimErrors,
+    });
+  }
+
   return writeResult(request, {
     contract,
     status: "passed",
@@ -85,6 +97,34 @@ export async function validateAgentOutput(
     value: schemaResult.value,
     errors: [],
   });
+}
+
+function validateContractClaims(
+  contract: AgentOutputContract,
+  value: unknown,
+): AgentOutputValidationReportError[] {
+  if (contract !== "testing-strategy-output") {
+    return [];
+  }
+
+  const output = value as TestingStrategyOutput;
+  const passedCommands = new Set(
+    output.commandEvidence
+      .filter((command) => command.status === "passed")
+      .map((command) => command.command),
+  );
+
+  return output.qualityGates
+    .filter(
+      (gate) => gate.status === "passed" && !passedCommands.has(gate.command),
+    )
+    .map((gate) => ({
+      type: "schema-violation",
+      contract,
+      path: "/qualityGates",
+      keyword: "commandEvidence",
+      message: `Testing Strategy output claims ${gate.command} passed without passed command evidence`,
+    }));
 }
 
 function parseJsonOutput(

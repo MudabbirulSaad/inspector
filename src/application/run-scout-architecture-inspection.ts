@@ -8,6 +8,7 @@ import type {
   RevisionRequest,
   RunConfig,
   ScoutOutput,
+  TestingStrategyOutput,
 } from "../domain/types.js";
 import type {
   AgentOutputArtifactWriter,
@@ -326,6 +327,60 @@ export async function runScoutArchitectureInspection(
     });
   }
 
+  const testingStrategySchemaResult = await runAgentWorkflowStep({
+    input,
+    workspace,
+    agentId: "testing_strategy",
+    progressName: "Testing Strategy",
+    repoIndexSummary,
+    memorySnapshot,
+    previousOutputs: {
+      scout: scoutOutput,
+      architecture: architectureOutput,
+      pattern_miner: patternMinerOutput,
+      flow_tracer: flowTracerOutput,
+    },
+  });
+
+  if (!testingStrategySchemaResult.valid) {
+    throw new InspectionRunFailedError(
+      `Testing Strategy schema validation failed: ${testingStrategySchemaResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+  schemaReports.push({ agentId: "testing_strategy", valid: true, errors: [] });
+
+  const testingStrategyOutput =
+    testingStrategySchemaResult.value as TestingStrategyOutput;
+  agentOutputs.testing_strategy = testingStrategyOutput;
+
+  input.progress?.("Validating Testing Strategy evidence");
+  const testingStrategyEvidenceResult = await validateEvidenceForAgent({
+    agentId: "testing_strategy",
+    workspace,
+    repositoryReader: input.repositoryReader,
+    entries,
+    findings: testingStrategyEvidenceFindings(testingStrategyOutput),
+    evidenceReports: input.evidenceReports,
+  });
+
+  if (!testingStrategyEvidenceResult.valid) {
+    throw new InspectionRunFailedError(
+      `Testing Strategy evidence validation failed: ${testingStrategyEvidenceResult.errors[0]?.message}`,
+      workspace,
+    );
+  }
+  evidenceReports.push({ agentId: "testing_strategy", valid: true, errors: [] });
+
+  for (const finding of testingStrategyOutput.findings) {
+    candidateFindings.push(finding);
+    await appendSwarmFinding({
+      finding,
+      memory: runMemory,
+      validator: input.validators.finding,
+    });
+  }
+
   input.progress?.("Running QA verification");
   let qa = await verifyFindingsWithQa({
     candidateFindings,
@@ -427,7 +482,12 @@ export async function runScoutArchitectureInspection(
 async function runAgentWorkflowStep(input: {
   input: RunScoutArchitectureInspectionInput;
   workspace: RunWorkspace;
-  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer";
+  agentId:
+    | "scout"
+    | "architecture"
+    | "pattern_miner"
+    | "flow_tracer"
+    | "testing_strategy";
   progressName: string;
   repoIndexSummary: unknown;
   memorySnapshot: string;
@@ -530,7 +590,11 @@ async function routeQaRevisionRequests(input: {
   revisionRequests: RevisionRequest[];
 }): Promise<void> {
   const requestsByOwner = new Map<
-    "scout" | "architecture" | "pattern_miner" | "flow_tracer",
+    | "scout"
+    | "architecture"
+    | "pattern_miner"
+    | "flow_tracer"
+    | "testing_strategy",
     RevisionRequest[]
   >();
 
@@ -539,7 +603,8 @@ async function routeQaRevisionRequests(input: {
       request.targetAgent === "scout" ||
       request.targetAgent === "architecture" ||
       request.targetAgent === "pattern_miner" ||
-      request.targetAgent === "flow_tracer"
+      request.targetAgent === "flow_tracer" ||
+      request.targetAgent === "testing_strategy"
     ) {
       requestsByOwner.set(request.targetAgent, [
         ...(requestsByOwner.get(request.targetAgent) ?? []),
@@ -621,13 +686,21 @@ async function routeQaRevisionRequests(input: {
 }
 
 function displayNameForAgent(
-  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer",
+  agentId:
+    | "scout"
+    | "architecture"
+    | "pattern_miner"
+    | "flow_tracer"
+    | "testing_strategy",
 ): string {
   if (agentId === "pattern_miner") {
     return "Pattern Miner";
   }
   if (agentId === "flow_tracer") {
     return "Flow Tracer";
+  }
+  if (agentId === "testing_strategy") {
+    return "Testing Strategy";
   }
   return agentId[0]?.toUpperCase() + agentId.slice(1);
 }
@@ -666,7 +739,12 @@ function replaceCandidateFindingsForAgent(
 }
 
 function findingsForAgentOutput(
-  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer",
+  agentId:
+    | "scout"
+    | "architecture"
+    | "pattern_miner"
+    | "flow_tracer"
+    | "testing_strategy",
   output: unknown,
 ): Finding[] {
   if (agentId === "scout") {
@@ -678,11 +756,19 @@ function findingsForAgentOutput(
   if (agentId === "pattern_miner") {
     return (output as PatternMinerOutput).findings;
   }
-  return (output as FlowTracerOutput).findings;
+  if (agentId === "flow_tracer") {
+    return (output as FlowTracerOutput).findings;
+  }
+  return (output as TestingStrategyOutput).findings;
 }
 
 function evidenceFindingsForAgentOutput(
-  agentId: "scout" | "architecture" | "pattern_miner" | "flow_tracer",
+  agentId:
+    | "scout"
+    | "architecture"
+    | "pattern_miner"
+    | "flow_tracer"
+    | "testing_strategy",
   output: unknown,
 ): Finding[] {
   if (agentId === "scout") {
@@ -694,7 +780,10 @@ function evidenceFindingsForAgentOutput(
   if (agentId === "pattern_miner") {
     return patternMinerEvidenceFindings(output as PatternMinerOutput);
   }
-  return flowTracerEvidenceFindings(output as FlowTracerOutput);
+  if (agentId === "flow_tracer") {
+    return flowTracerEvidenceFindings(output as FlowTracerOutput);
+  }
+  return testingStrategyEvidenceFindings(output as TestingStrategyOutput);
 }
 
 function renderInitialMemorySnapshot(objective: string): string {
@@ -884,6 +973,81 @@ function flowTracerEvidenceFindings(output: FlowTracerOutput): Finding[] {
     })),
     ...output.findings,
   ];
+}
+
+function testingStrategyEvidenceFindings(
+  output: TestingStrategyOutput,
+): Finding[] {
+  return [
+    ...output.testTypesFound.map((item, index) =>
+      testingStrategyNoteFinding("test-type", index, item),
+    ),
+    ...output.qualityGates.map((gate, index) => ({
+      id: `finding-testing-strategy-quality-gate-${index + 1}`,
+      agent: "testing_strategy",
+      severity: "info" as const,
+      claim: `${gate.command}: ${gate.status}. ${gate.summary}`,
+      evidence: gate.evidence,
+      recommendation:
+        gate.status === "not-run"
+          ? "Do not claim this gate passed until the command is run."
+          : "Preserve this quality gate with explicit command evidence.",
+      confidence: gate.status === "passed" ? 0.7 : 0.5,
+    })),
+    ...output.behaviorProtected.map((item, index) =>
+      testingStrategyNoteFinding("behavior-protected", index, item),
+    ),
+    ...output.behaviorNotProtected.map((item, index) =>
+      testingStrategyNoteFinding("behavior-not-protected", index, item),
+    ),
+    ...output.commandEvidence.map((command, index) => ({
+      id: `finding-testing-strategy-command-${index + 1}`,
+      agent: "testing_strategy",
+      severity: "info" as const,
+      claim: `${command.command}: ${command.status}`,
+      evidence: command.evidence,
+      recommendation:
+        command.status === "not-run"
+          ? "Treat this command as available but unexecuted."
+          : "Keep command result claims tied to this recorded evidence.",
+      confidence: command.status === "passed" ? 0.7 : 0.5,
+    })),
+    ...output.testingRisks.map((item, index) =>
+      testingStrategyNoteFinding("risk", index, item, "medium"),
+    ),
+    ...output.recommendations.map((recommendation, index) => ({
+      id: `finding-testing-strategy-recommendation-${index + 1}`,
+      agent: "testing_strategy",
+      severity: recommendation.priority,
+      claim: recommendation.summary,
+      evidence: recommendation.evidence,
+      recommendation: recommendation.summary,
+      confidence: 0.6,
+    })),
+    ...output.findings,
+  ];
+}
+
+function testingStrategyNoteFinding(
+  kind: string,
+  index: number,
+  item: {
+    name: string;
+    summary: string;
+    evidence: Evidence[];
+  },
+  severity: Finding["severity"] = "info",
+): Finding {
+  return {
+    id: `finding-testing-strategy-${kind}-${index + 1}`,
+    agent: "testing_strategy",
+    severity,
+    claim: `${item.name}: ${item.summary}`,
+    evidence: item.evidence,
+    recommendation:
+      "Use this testing-strategy observation only with its cited evidence.",
+    confidence: 0.5,
+  };
 }
 
 function architectureObservationFinding(

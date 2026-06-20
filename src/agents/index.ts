@@ -96,18 +96,37 @@ const agentContracts = [
     qaRevisionOwnership: { ownsRevisionFor: ["flow_tracer"] },
   },
   {
+    id: "testing_strategy",
+    role: "testing strategy inspector",
+    description:
+      "Evaluates test coverage, validation commands, and risk-based testing gaps.",
+    lifecycle: "v1",
+    dependencies: ["architecture", "pattern_miner", "flow_tracer"],
+    outputArtifacts: ["agents/testing_strategy/attempt-{attempt}/output.json"],
+    outputSchema: "testing-strategy-output",
+    retryPolicy: defaultRetryPolicy,
+    required: true,
+    qaRevisionOwnership: { ownsRevisionFor: ["testing_strategy"] },
+  },
+  {
     id: "qa_verifier",
     role: "QA verifier",
     description:
       "Checks validated findings for evidence quality, accuracy, and follow-up requirements.",
     lifecycle: "v1",
-    dependencies: ["architecture", "pattern_miner", "flow_tracer"],
+    dependencies: ["architecture", "pattern_miner", "flow_tracer", "testing_strategy"],
     outputArtifacts: ["qa/results.json"],
     outputSchema: "qa-result",
     retryPolicy: defaultRetryPolicy,
     required: true,
     qaRevisionOwnership: {
-      ownsRevisionFor: ["scout", "architecture", "pattern_miner", "flow_tracer"],
+      ownsRevisionFor: [
+        "scout",
+        "architecture",
+        "pattern_miner",
+        "flow_tracer",
+        "testing_strategy",
+      ],
     },
   },
   {
@@ -122,19 +141,6 @@ const agentContracts = [
     retryPolicy: defaultRetryPolicy,
     required: true,
     qaRevisionOwnership: { ownsRevisionFor: [] },
-  },
-  {
-    id: "testing_strategy",
-    role: "testing strategy inspector",
-    description:
-      "Evaluates test coverage, validation commands, and risk-based testing gaps.",
-    lifecycle: "later",
-    dependencies: ["scout", "architecture", "pattern_miner"],
-    outputArtifacts: ["agents/testing_strategy/findings.json"],
-    outputSchema: "finding",
-    retryPolicy: defaultRetryPolicy,
-    required: false,
-    qaRevisionOwnership: { ownsRevisionFor: ["testing_strategy"] },
   },
   {
     id: "tradeoff_analyst",
