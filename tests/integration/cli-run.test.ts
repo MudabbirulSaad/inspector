@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chdir, cwd } from "node:process";
+import { chdir, cwd, execPath } from "node:process";
 import test from "node:test";
 
 import { FakeAgentRunner } from "../../src/adapters/codex/index.js";
@@ -578,6 +578,36 @@ async function createFixture(): Promise<{
   return { tempDirectory, repoPath, objectivePath, outPath };
 }
 
+async function writeFixtureAgentProcess(path: string): Promise<void> {
+  const outputs: Record<string, unknown> = {
+    scout: scoutOutput,
+    architecture: architectureOutput,
+    pattern_miner: patternMinerOutput,
+    flow_tracer: flowTracerOutput,
+    testing_strategy: testingStrategyOutput,
+    tradeoff_analyst: tradeoffAnalystOutput,
+  };
+
+  await writeFile(
+    path,
+    [
+      `const outputs = ${JSON.stringify(outputs)};`,
+      "const agentId = process.argv[2];",
+      "if (!process.argv.includes('--sentinel')) {",
+      "  console.error('missing sentinel arg');",
+      "  process.exit(1);",
+      "}",
+      "const output = outputs[agentId];",
+      "if (output === undefined) {",
+      "  console.error(`unknown agent: ${agentId}`);",
+      "  process.exit(1);",
+      "}",
+      "console.log(JSON.stringify(output));",
+      "",
+    ].join("\n"),
+  );
+}
+
 test("CLI run creates a run workspace for a valid command", async () => {
   const fixture = await createFixture();
   const stdout: string[] = [];
@@ -968,6 +998,185 @@ test("CLI run accepts a declarative inspection config file", async () => {
   assert.equal(savedConfig.parallelism, 1);
   assert.equal(savedConfig.maxRetries, 3);
   assert.deepEqual(savedConfig.runner, { provider: "fake" });
+});
+
+test("CLI config run accepts folded YAML targetContext", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const runner = successfulRunner();
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect folded context.",
+      "targetContext: >",
+      "  line one",
+      "  line two",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  const scoutPrompt = runner.requests[0]?.prompt ?? "";
+  assert.match(scoutPrompt, /line one/);
+  assert.match(scoutPrompt, /line two/);
+});
+
+test("CLI config run preserves nested process runner args", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const scriptPath = join(fixture.tempDirectory, "agent-fixture.mjs");
+  await writeFixtureAgentProcess(scriptPath);
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect nested runner args.",
+      "runner:",
+      "  provider: process",
+      `  command: ${execPath}`,
+      "  args:",
+      `    - ${scriptPath}`,
+      '    - "{agentId}"',
+      "    - --sentinel",
+      "  timeoutMs: 10000",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(
+    await stat(
+      join(
+        fixture.outPath,
+        "2026-06-20T01-02-03-004Z_target-repo",
+        "final",
+        "docs",
+        "00-executive-summary.md",
+      ),
+    ).then((metadata) => metadata.isFile()),
+    true,
+  );
+});
+
+test("CLI config run preserves Codex prompt placeholder args", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect Codex config parsing.",
+      "runner:",
+      "  provider: codex",
+      "  command: codex",
+      "  args:",
+      "    - exec",
+      "    - --dangerously-bypass-approvals-and-sandbox",
+      '    - "{prompt}"',
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  const savedConfig = JSON.parse(
+    await readFile(
+      join(
+        fixture.outPath,
+        "2026-06-20T01-02-03-004Z_target-repo",
+        "config.json",
+      ),
+      "utf8",
+    ),
+  ) as { runner?: { provider?: string; command?: string; args?: string[] } };
+  assert.deepEqual(savedConfig.runner, {
+    provider: "codex",
+    command: "codex",
+    args: ["exec", "--dangerously-bypass-approvals-and-sandbox", "{prompt}"],
+  });
+});
+
+test("CLI config run rejects unknown top-level fields", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const stderr: string[] = [];
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect strict config parsing.",
+      "unexpected: value",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(stderr.join("\n"), /Invalid inspection config: unknown field 'unexpected'/);
+});
+
+test("CLI config run rejects scalar runner args", async () => {
+  const fixture = await createFixture();
+  const configPath = join(fixture.tempDirectory, "inspection.yaml");
+  const stderr: string[] = [];
+  await writeFile(
+    configPath,
+    [
+      `repoPath: ${fixture.repoPath}`,
+      `outputPath: ${fixture.outPath}`,
+      "objective: Inspect invalid runner args.",
+      "runner:",
+      "  provider: codex",
+      "  command: codex",
+      '  args: "exec"',
+      "",
+    ].join("\n"),
+  );
+
+  const result = await runInspectorCli({
+    argv: ["run", configPath],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(
+    stderr.join("\n"),
+    /Invalid inspection config: 'runner.args' must be a list of strings/,
+  );
 });
 
 test("CLI config run rejects parallelism greater than one before scheduler runtime wiring", async () => {

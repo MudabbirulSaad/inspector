@@ -1,7 +1,8 @@
 # Configuration Reference
 
-`inspector run inspection.yaml` accepts a small YAML subset: top-level key/value
-pairs, top-level lists, and one-level object blocks. Unknown fields fail fast.
+`inspector run inspection.yaml` accepts a YAML object with strict Inspector
+fields. Standard YAML strings, folded block scalars, lists, and nested runner
+objects are supported. Unknown top-level fields fail fast.
 
 ## Example
 
@@ -9,7 +10,8 @@ pairs, top-level lists, and one-level object blocks. Unknown fields fail fast.
 repoPath: ./my-repo
 outputPath: ./.inspector-runs
 objective: Inspect architecture, reusable patterns, flows, testing, and tradeoffs.
-targetContext: Focus on code paths used by the CLI.
+targetContext: >
+  Focus on code paths used by the CLI.
 verbose: true
 maxRetries: 1
 runQualityCommands: false
@@ -18,7 +20,8 @@ runner:
   command: codex
   args:
     - exec
-    - --json
+    - --dangerously-bypass-approvals-and-sandbox
+    - "{prompt}"
   timeoutMs: 300000
 ```
 
@@ -76,6 +79,8 @@ deterministic fake runner.
 
 `runner.args`
 : Optional list of string arguments passed to the process-backed runner.
+Arguments may include placeholders such as `{prompt}`, `{agentId}`,
+`{attempt}`, and `{workspaceRoot}`.
 
 `runner.timeoutMs`
 : Optional integer timeout in milliseconds. Also applies to trusted quality
@@ -95,8 +100,9 @@ runner:
   command: codex
   args:
     - exec
-    - --json
-  timeoutMs: 300000
+    - --dangerously-bypass-approvals-and-sandbox
+    - "{prompt}"
+  timeoutMs: 600000
 ```
 
 Keep authentication, tokens, and machine-specific Codex setup outside this

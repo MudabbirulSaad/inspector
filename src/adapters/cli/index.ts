@@ -2,6 +2,8 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parse as parseYaml } from "yaml";
+
 import {
   InspectionRunFailedError,
   resumeScoutArchitectureInspection,
@@ -640,52 +642,23 @@ function resolveConfigPath(root: string, path: string): string {
 }
 
 function parseInspectionConfigFile(content: string): InspectionConfigFile {
-  const config: Record<string, unknown> = {};
-  const lines = content.split(/\r?\n/);
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = stripYamlComment(lines[index] ?? "");
-    if (line.trim().length === 0) {
-      continue;
-    }
-    if (line.startsWith(" ")) {
-      throw new Error(`Invalid inspection config: unexpected indentation on line ${index + 1}`);
-    }
-
-    const separator = line.indexOf(":");
-    if (separator === -1) {
-      throw new Error(`Invalid inspection config: expected key/value on line ${index + 1}`);
-    }
-
-    const key = line.slice(0, separator).trim();
-    const rawValue = line.slice(separator + 1).trim();
-    if (!isKnownConfigKey(key)) {
-      throw new Error(`Invalid inspection config: unknown field '${key}'`);
-    }
-
-    if (rawValue.length > 0) {
-      config[key] = parseYamlScalar(rawValue, key);
-      continue;
-    }
-
-    const nestedLines: string[] = [];
-    while (index + 1 < lines.length && (lines[index + 1] ?? "").startsWith(" ")) {
-      index += 1;
-      const nestedLine = stripYamlComment(lines[index] ?? "");
-      if (nestedLine.trim().length > 0) {
-        nestedLines.push(nestedLine);
-      }
-    }
-
-    config[key] = parseYamlBlock(key, nestedLines);
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(content);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid inspection config: ${message}`, { cause: error });
   }
 
-  return normalizeInspectionConfig(config);
-}
+  if (parsed === null) {
+    return normalizeInspectionConfig({});
+  }
+  if (!isRecord(parsed)) {
+    throw new Error("Invalid inspection config: root must be an object");
+  }
 
-function stripYamlComment(line: string): string {
-  const commentIndex = line.indexOf(" #");
-  return commentIndex === -1 ? line : line.slice(0, commentIndex);
+  assertKnownConfigKeys(parsed);
+  return normalizeInspectionConfig(parsed);
 }
 
 function isKnownConfigKey(key: string): boolean {
@@ -703,55 +676,12 @@ function isKnownConfigKey(key: string): boolean {
   ].includes(key);
 }
 
-function parseYamlBlock(key: string, lines: string[]): unknown {
-  if (lines.length === 0) {
-    throw new Error(`Invalid inspection config: '${key}' must not be empty`);
-  }
-
-  if (lines.every((line) => line.trimStart().startsWith("- "))) {
-    return lines.map((line) => parseYamlScalar(line.trimStart().slice(2), key));
-  }
-
-  const object: Record<string, unknown> = {};
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const separator = trimmed.indexOf(":");
-    if (separator === -1) {
-      throw new Error(`Invalid inspection config: invalid '${key}' block`);
+function assertKnownConfigKeys(config: Record<string, unknown>): void {
+  for (const key of Object.keys(config)) {
+    if (!isKnownConfigKey(key)) {
+      throw new Error(`Invalid inspection config: unknown field '${key}'`);
     }
-
-    const nestedKey = trimmed.slice(0, separator).trim();
-    const rawValue = trimmed.slice(separator + 1).trim();
-    object[nestedKey] = parseYamlScalar(rawValue, `${key}.${nestedKey}`);
   }
-  return object;
-}
-
-function parseYamlScalar(value: string, key: string): string | number | boolean {
-  const unquoted = stripYamlQuotes(value);
-  if (unquoted === "true") {
-    return true;
-  }
-  if (unquoted === "false") {
-    return false;
-  }
-  if (/^\d+$/.test(unquoted)) {
-    return Number(unquoted);
-  }
-  if (unquoted.length === 0) {
-    throw new Error(`Invalid inspection config: '${key}' must not be empty`);
-  }
-  return unquoted;
-}
-
-function stripYamlQuotes(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
 }
 
 function normalizeInspectionConfig(config: Record<string, unknown>): InspectionConfigFile {
