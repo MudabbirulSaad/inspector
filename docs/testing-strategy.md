@@ -25,6 +25,11 @@ published contracts, including external schema references. Future agent outputs
 should be checked against the same schemas before they are accepted into reports
 or memory.
 
+Runtime validation tests exercise the public validator adapter in
+`src/validation`. They validate known-good examples for findings, QA results,
+knowledge cards, memory events, and inspection reports, and verify that invalid
+artifacts return clear contract, path, keyword, and message details.
+
 ## Type Checking
 
 Domain contract interfaces in `src/domain/types.ts` should mirror the JSON

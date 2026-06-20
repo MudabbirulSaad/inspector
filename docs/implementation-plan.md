@@ -214,3 +214,41 @@ git status
 ```bash
 feat(domain): add schema-aligned inspection models
 ```
+
+### Milestone 05: Runtime Schema Validation Adapter
+
+#### Goal
+
+Wrap existing JSON Schemas in reusable runtime validation utilities.
+
+#### Tasks
+
+- Added runtime validators for findings, QA results, knowledge cards, memory
+  events, and inspection reports.
+- Reused the existing JSON Schema files as the source of truth instead of
+  duplicating schema definitions in TypeScript.
+- Returned structured validation errors with contract, path, keyword, and
+  message details for orchestrator, CLI, and test callers.
+- Preserved existing schema/example tests.
+
+#### TDD
+
+Added a unit test for validating a real finding example and rejecting an invalid
+finding first, then expanded coverage to valid examples and invalid artifacts
+for every runtime agent output contract.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(validation): wrap JSON schema contracts for runtime use
+```

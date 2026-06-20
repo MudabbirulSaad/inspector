@@ -28,8 +28,9 @@ Implementation should proceed through TDD-driven vertical slices. Each milestone
 
 The repository currently contains governance documentation, JSON Schemas,
 examples, schema/example validation tests, TypeScript configuration, lint
-tooling, schema-aligned domain model exports, and minimal hexagonal source
-boundaries. Runtime CLI behavior is still pending.
+tooling, schema-aligned domain model exports, minimal hexagonal source
+boundaries, and runtime JSON Schema validators for core agent output contracts.
+Runtime CLI behavior is still pending.
 
 ## Non-Goals
 

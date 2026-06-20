@@ -51,3 +51,8 @@ Schemas define minimum acceptable structure. Passing schema validation does not
 prove a claim is correct; it proves the output is complete enough for review and
 downstream tooling. TypeScript domain models in `src/domain/types.ts` must stay
 aligned with these schemas.
+
+The runtime validation adapter in `src/validation` wraps the existing schema
+files for use by orchestrator, CLI, and test callers. It currently exposes
+validators for findings, QA results, knowledge cards, memory events, and
+inspection reports without duplicating schema definitions in TypeScript.

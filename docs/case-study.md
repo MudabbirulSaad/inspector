@@ -18,7 +18,9 @@ The workflow is intentionally governed. Humans define milestones and acceptance 
 
 ## Quality Gates
 
-Planned quality gates include tests, schema validation, type checking, linting, and production builds. Current validation focuses on JSON Schema contracts and examples.
+Quality gates include tests, schema validation, runtime contract validation,
+type checking, linting, and production builds. Current validation covers JSON
+Schema contracts, examples, and reusable validators for core agent outputs.
 
 ## Evidence-Driven Findings
 
