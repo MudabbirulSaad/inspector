@@ -1327,3 +1327,44 @@ git status
 ```bash
 feat(agents): analyze architecture tradeoffs and risks
 ```
+
+### Milestone 29: Professional Verbose CLI Output
+
+#### Goal
+
+Improve CLI progress output.
+
+#### Tasks
+
+- Kept non-verbose `inspector run` concise: it prints only the final run
+  workspace path on success.
+- Expanded `--verbose` progress to include run start, workspace creation,
+  repository indexing start/finish, agent start/finish by attempt, validation
+  pass status, QA issue counts, retry routing, final QA summary, final docs
+  path, and run workspace path.
+- Preserved agent streaming events in verbose mode.
+- Added useful runtime failure output with the failed run workspace path when
+  available.
+- Hid stack traces by default and added `--debug` to show them when needed.
+
+#### TDD
+
+Added CLI integration tests for professional verbose progress, concise
+non-verbose output, useful failure messages without stack traces, and debug
+stack trace output.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(cli): stream professional inspection progress
+```

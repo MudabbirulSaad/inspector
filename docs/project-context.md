@@ -62,9 +62,13 @@ computes a deterministic readiness score. The runtime CLI slice now parses
 `inspector run`, validates repository and objective paths, wires concrete
 adapters, prints progress, and calls a Scout/Architecture/Pattern Miner/Flow
 Tracer/Testing Strategy/Tradeoff Analyst plus QA
-application use case. That use case creates a run workspace, indexes the
-repository, initializes memory, builds auditable Scout, Architecture, and
-Pattern Miner prompts, then builds Flow Tracer, Testing Strategy, and Tradeoff Analyst prompts
+application use case. Verbose mode now streams professional progress for run
+start, repository indexing, agent lifecycle, validation, retry routing, QA
+issues, final QA summary, and final output paths, while non-verbose mode remains
+concise. Runtime stack traces are hidden unless `--debug` is enabled. That use
+case creates a run workspace, indexes the repository, initializes memory, builds
+auditable Scout, Architecture, and Pattern Miner prompts, then builds Flow
+Tracer, Testing Strategy, and Tradeoff Analyst prompts
 from prior specialist outputs. It runs Scout before Architecture before Pattern
 Miner before Flow Tracer before Testing Strategy before Tradeoff Analyst through the runner port,
 validates structured schemas and cited evidence,

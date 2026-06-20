@@ -51,6 +51,7 @@ interface ParsedRunCommand {
   objectivePath: string;
   outPath: string;
   verbose: boolean;
+  debug: boolean;
 }
 
 const systemClock: Clock = {
@@ -66,8 +67,10 @@ export async function runInspectorCli(
   const stdout = request.stdout ?? console.log;
   const stderr = request.stderr ?? console.error;
 
+  let debug = request.argv.includes("--debug");
   try {
     const command = parseRunCommand(request.argv);
+    debug = command.debug;
     await assertDirectory(command.repoPath, "Repository path");
     await assertFile(command.objectivePath, "Objective file");
 
@@ -86,6 +89,7 @@ export async function runInspectorCli(
       verbose: command.verbose,
     };
 
+    printProgress(stdout, command.verbose, `Inspection started: ${config.target.name}`);
     const result = await runScoutArchitectureInspection({
       config,
       objective,
@@ -119,10 +123,15 @@ export async function runInspectorCli(
       },
     });
 
+    printProgress(
+      stdout,
+      command.verbose,
+      `Final output: ${result.workspace.root}/final/docs`,
+    );
     stdout(`Inspection run workspace: ${result.workspace.root}`);
     return { exitCode: 0, workspace: result.workspace };
   } catch (error) {
-    stderr(error instanceof Error ? error.message : "Unknown CLI error");
+    printCliError(stderr, error, debug);
     return {
       exitCode: 1,
       workspace:
@@ -134,7 +143,7 @@ export async function runInspectorCli(
 function parseRunCommand(argv: string[]): ParsedRunCommand {
   if (argv[0] !== "run") {
     throw new Error(
-      "Usage: inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose]",
+      "Usage: inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose] [--debug]",
     );
   }
 
@@ -151,6 +160,7 @@ function parseRunCommand(argv: string[]): ParsedRunCommand {
     objectivePath,
     outPath,
     verbose: argv.includes("--verbose"),
+    debug: argv.includes("--debug"),
   };
 }
 
@@ -202,5 +212,28 @@ function printProgress(
 ): void {
   if (verbose) {
     stdout(message);
+  }
+}
+
+function printCliError(
+  stderr: (line: string) => void,
+  error: unknown,
+  debug: boolean,
+): void {
+  if (!(error instanceof Error)) {
+    stderr("Unknown CLI error");
+    return;
+  }
+
+  stderr(error.message);
+
+  if (error instanceof InspectionRunFailedError) {
+    stderr(`Run workspace: ${error.workspace.root}`);
+  }
+
+  if (debug) {
+    stderr(error.stack ?? error.message);
+  } else {
+    stderr("Use --debug to show the stack trace.");
   }
 }

@@ -7,8 +7,12 @@ The current runtime slice supports Scout, Architecture, Pattern Miner, Flow Trac
 The current standalone CLI runtime uses a deterministic fake runner by default. Real process-backed runner infrastructure exists, but CLI configuration for real Codex execution is not exposed yet.
 
 ```bash
-inspector run <repo-path> --objective <objective-file> --out <output-path> --verbose
+inspector run <repo-path> --objective <objective-file> --out <output-path> [--verbose] [--debug]
 ```
+
+Use `--verbose` to stream professional inspection progress, including indexing,
+agent lifecycle, validation, retry, QA, and final output locations. Stack traces
+are hidden by default and shown only with `--debug`.
 
 ## Goals
 

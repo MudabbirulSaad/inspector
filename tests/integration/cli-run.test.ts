@@ -555,6 +555,33 @@ test("CLI run creates a run workspace for a valid command", async () => {
   );
 });
 
+test("CLI run stays concise without verbose output", async () => {
+  const fixture = await createFixture();
+  const stdout: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: successfulRunner(),
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(stdout, [
+    `Inspection run workspace: ${join(
+      fixture.outPath,
+      "2026-06-20T01-02-03-004Z_target-repo",
+    )}`,
+  ]);
+});
+
 test("CLI run loads prompts and schemas when started outside the project root", async () => {
   const fixture = await createFixture();
   const unrelatedCwd = join(fixture.tempDirectory, "unrelated-cwd");
@@ -1417,20 +1444,90 @@ test("CLI run prints verbose progress and Scout streaming output", async () => {
   });
 
   assert.equal(result.exitCode, 0);
-  assert.match(stdout.join("\n"), /Creating run workspace/);
-  assert.match(stdout.join("\n"), /Indexing repository/);
+  assert.match(stdout.join("\n"), /Run workspace creation started/);
+  assert.match(stdout.join("\n"), /Repository indexing started/);
   assert.match(stdout.join("\n"), /\[scout:status\] Scout started/);
-  assert.match(stdout.join("\n"), /Running Architecture/);
+  assert.match(stdout.join("\n"), /Agent started: Architecture/);
   assert.match(stdout.join("\n"), /\[architecture:status\] Scout started/);
-  assert.match(stdout.join("\n"), /Running Pattern Miner/);
+  assert.match(stdout.join("\n"), /Agent started: Pattern Miner/);
   assert.match(stdout.join("\n"), /\[pattern_miner:status\] Scout started/);
-  assert.match(stdout.join("\n"), /Running Flow Tracer/);
+  assert.match(stdout.join("\n"), /Agent started: Flow Tracer/);
   assert.match(stdout.join("\n"), /\[flow_tracer:status\] Scout started/);
-  assert.match(stdout.join("\n"), /Running Testing Strategy/);
+  assert.match(stdout.join("\n"), /Agent started: Testing Strategy/);
   assert.match(stdout.join("\n"), /\[testing_strategy:status\] Scout started/);
-  assert.match(stdout.join("\n"), /Running Tradeoff Analyst/);
+  assert.match(stdout.join("\n"), /Agent started: Tradeoff Analyst/);
   assert.match(stdout.join("\n"), /\[tradeoff_analyst:status\] Scout started/);
   assert.match(stdout.join("\n"), /Inspection run workspace:/);
+});
+
+test("CLI run prints professional verbose inspection progress", async () => {
+  const fixture = await createFixture();
+  const stdout: string[] = [];
+  const contradictoryArchitectureOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        id: "finding-architecture-uses-ports",
+        claim: "Application orchestration uses ports.",
+      },
+      {
+        ...architectureFinding,
+        id: "finding-architecture-does-not-use-ports",
+        claim: "Application orchestration does not use ports.",
+      },
+    ],
+  };
+  const repairedArchitectureOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        id: "finding-architecture-uses-ports",
+        claim: "Application orchestration uses ports.",
+      },
+    ],
+  };
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+      "--verbose",
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [
+        successfulScoutResult(),
+        successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
+        successfulPatternMinerResult(),
+        successfulFlowTracerResult(),
+        successfulTestingStrategyResult(),
+        successfulTradeoffAnalystResult(),
+        successfulArchitectureResult(JSON.stringify(repairedArchitectureOutput)),
+      ],
+    }),
+    stdout: (line) => stdout.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  const output = stdout.join("\n");
+  assert.match(output, /Inspection started: target-repo/);
+  assert.match(output, /Repository indexing started/);
+  assert.match(output, /Repository indexing finished/);
+  assert.match(output, /Agent started: Scout \(attempt 1\)/);
+  assert.match(output, /Agent finished: Scout \(attempt 1\)/);
+  assert.match(output, /Validation passed: Scout schema/);
+  assert.match(output, /Validation passed: Scout evidence/);
+  assert.match(output, /QA issues found: [1-9]/);
+  assert.match(output, /Retrying Architecture after QA feedback \(attempt 2\)/);
+  assert.match(output, /QA verification passed: 6 approved, 0 rejected/);
+  assert.match(output, /Final output: .*final\/docs/);
+  assert.match(output, /Inspection run workspace:/);
 });
 
 test("CLI run fails when Scout output is not schema-valid", async () => {
@@ -1458,6 +1555,67 @@ test("CLI run fails when Scout output is not schema-valid", async () => {
 
   assert.equal(result.exitCode, 1);
   assert.match(stderr.join("\n"), /Scout schema validation failed/);
+});
+
+test("CLI run reports useful failures without stack traces by default", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [successfulScoutResult(JSON.stringify({ findings: [scoutFinding] }))],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  const errorOutput = stderr.join("\n");
+  assert.equal(result.exitCode, 1);
+  assert.match(errorOutput, /Scout schema validation failed/);
+  assert.match(
+    errorOutput,
+    /Run workspace: .*2026-06-20T01-02-03-004Z_target-repo/,
+  );
+  assert.match(errorOutput, /Use --debug to show the stack trace/);
+  assert.doesNotMatch(errorOutput, /\n\s+at /);
+});
+
+test("CLI run prints stack traces when debug mode is enabled", async () => {
+  const fixture = await createFixture();
+  const stderr: string[] = [];
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+      "--debug",
+    ],
+    clock: fixedClock,
+    runner: new FakeAgentRunner({
+      results: [successfulScoutResult(JSON.stringify({ findings: [scoutFinding] }))],
+    }),
+    stderr: (line) => stderr.push(line),
+    stdout: () => undefined,
+  });
+
+  const errorOutput = stderr.join("\n");
+  assert.equal(result.exitCode, 1);
+  assert.match(errorOutput, /Scout schema validation failed/);
+  assert.match(errorOutput, /Run workspace:/);
+  assert.match(errorOutput, /\n\s+at /);
 });
 
 test("CLI run fails when Scout evidence cites missing repository lines", async () => {

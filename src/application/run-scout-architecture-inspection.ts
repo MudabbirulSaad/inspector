@@ -97,22 +97,24 @@ export class InspectionRunFailedError extends Error {
 export async function runScoutArchitectureInspection(
   input: RunScoutArchitectureInspectionInput,
 ): Promise<RunScoutArchitectureInspectionResult> {
-  input.progress?.("Creating run workspace");
+  input.progress?.("Run workspace creation started");
   const workspace = await createInspectionRunWorkspace({
     config: input.config,
     clock: input.clock,
     workspaces: input.workspaces,
   });
+  input.progress?.("Run workspace creation finished");
 
   const entries = await input.repositoryReader.listEntries();
 
-  input.progress?.("Indexing repository");
+  input.progress?.("Repository indexing started");
   await indexTargetRepository({
     target: input.config.target,
     reader: input.repositoryReader,
     writer: input.repositoryIndexWriter,
     workspace,
   });
+  input.progress?.("Repository indexing finished");
   const repoIndexSummary =
     await input.repositoryIndexContext.readRepositoryIndexPromptContext(workspace);
 
@@ -146,6 +148,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   schemaReports.push({ agentId: "scout", valid: true, errors: [] });
+  input.progress?.("Validation passed: Scout schema");
 
   const scoutOutput = scoutSchemaResult.value as ScoutOutput;
   agentOutputs.scout = scoutOutput;
@@ -168,6 +171,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   evidenceReports.push({ agentId: "scout", valid: true, errors: [] });
+  input.progress?.("Validation passed: Scout evidence");
 
   for (const finding of scoutOutput.findings) {
     candidateFindings.push(finding);
@@ -195,6 +199,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   schemaReports.push({ agentId: "architecture", valid: true, errors: [] });
+  input.progress?.("Validation passed: Architecture schema");
 
   const architectureOutput =
     architectureSchemaResult.value as ArchitectureOutput;
@@ -217,6 +222,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   evidenceReports.push({ agentId: "architecture", valid: true, errors: [] });
+  input.progress?.("Validation passed: Architecture evidence");
 
   for (const finding of architectureOutput.findings) {
     candidateFindings.push(finding);
@@ -244,6 +250,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   schemaReports.push({ agentId: "pattern_miner", valid: true, errors: [] });
+  input.progress?.("Validation passed: Pattern Miner schema");
 
   const patternMinerOutput =
     patternMinerSchemaResult.value as PatternMinerOutput;
@@ -266,6 +273,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   evidenceReports.push({ agentId: "pattern_miner", valid: true, errors: [] });
+  input.progress?.("Validation passed: Pattern Miner evidence");
 
   for (const finding of patternMinerOutput.findings) {
     candidateFindings.push(finding);
@@ -297,6 +305,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   schemaReports.push({ agentId: "flow_tracer", valid: true, errors: [] });
+  input.progress?.("Validation passed: Flow Tracer schema");
 
   const flowTracerOutput = flowTracerSchemaResult.value as FlowTracerOutput;
   agentOutputs.flow_tracer = flowTracerOutput;
@@ -318,6 +327,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   evidenceReports.push({ agentId: "flow_tracer", valid: true, errors: [] });
+  input.progress?.("Validation passed: Flow Tracer evidence");
 
   for (const finding of flowTracerOutput.findings) {
     candidateFindings.push(finding);
@@ -350,6 +360,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   schemaReports.push({ agentId: "testing_strategy", valid: true, errors: [] });
+  input.progress?.("Validation passed: Testing Strategy schema");
 
   const testingStrategyOutput =
     testingStrategySchemaResult.value as TestingStrategyOutput;
@@ -372,6 +383,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   evidenceReports.push({ agentId: "testing_strategy", valid: true, errors: [] });
+  input.progress?.("Validation passed: Testing Strategy evidence");
 
   for (const finding of testingStrategyOutput.findings) {
     candidateFindings.push(finding);
@@ -405,6 +417,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   schemaReports.push({ agentId: "tradeoff_analyst", valid: true, errors: [] });
+  input.progress?.("Validation passed: Tradeoff Analyst schema");
 
   const tradeoffAnalystOutput =
     tradeoffAnalystSchemaResult.value as TradeoffAnalystOutput;
@@ -427,6 +440,7 @@ export async function runScoutArchitectureInspection(
     );
   }
   evidenceReports.push({ agentId: "tradeoff_analyst", valid: true, errors: [] });
+  input.progress?.("Validation passed: Tradeoff Analyst evidence");
 
   for (const finding of tradeoffAnalystOutput.findings) {
     candidateFindings.push(finding);
@@ -456,6 +470,7 @@ export async function runScoutArchitectureInspection(
       validator: input.validators["qa-issue"],
     });
   }
+  input.progress?.(`QA issues found: ${qa.qaIssues.length}`);
 
   if (qa.revisionRequests.length > 0) {
     input.progress?.("Routing QA revisions to owner agents");
@@ -492,7 +507,12 @@ export async function runScoutArchitectureInspection(
         validator: input.validators["qa-issue"],
       });
     }
+    input.progress?.(`QA issues found after retry: ${qa.qaIssues.length}`);
   }
+
+  input.progress?.(
+    `QA verification passed: ${qa.approvedFindings.length} approved, ${qa.rejectedFindings.length} rejected`,
+  );
 
   for (const finding of qa.approvedFindings) {
     await appendVerifiedSwarmFinding({
@@ -571,11 +591,7 @@ async function runAgentWorkflowStep(input: {
     ),
   });
 
-  input.input.progress?.(
-    attempt === 1
-      ? `Running ${input.progressName}`
-      : `Running ${input.progressName} revision attempt ${attempt}`,
-  );
+  input.input.progress?.(`Agent started: ${input.progressName} (attempt ${attempt})`);
   const run = await executeAgentRun({
     runner: input.input.runner,
     agentId: input.agentId,
@@ -592,6 +608,7 @@ async function runAgentWorkflowStep(input: {
     attempt,
     content: run.stdout,
   });
+  input.input.progress?.(`Agent finished: ${input.progressName} (attempt ${attempt})`);
 
   input.input.progress?.(`Validating ${input.progressName} schema`);
   return validateAgentOutput({
@@ -680,6 +697,9 @@ async function routeQaRevisionRequests(input: {
       continue;
     }
 
+    input.input.progress?.(
+      `Retrying ${displayNameForAgent(agentId)} after QA feedback (attempt ${nextAttempt})`,
+    );
     const schemaResult = await runAgentWorkflowStep({
       input: input.input,
       workspace: input.workspace,
