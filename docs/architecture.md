@@ -65,6 +65,8 @@ Application services depend on ports, not concrete adapters.
 Application responsibilities include:
 
 - Owning workflow control and scheduler decisions.
+- Creating auditable run workspace requests through ports before runtime
+  artifacts are written.
 - Building the repository inspection plan from indexed repository metadata.
 - Dispatching specialist agents only when their dependencies are satisfied.
 - Accepting only schema-valid and evidence-backed findings.
@@ -82,6 +84,9 @@ Adapter responsibilities include:
 - CLI adapters parse arguments, handle user-visible errors, and call application
   use cases.
 - Filesystem adapters read target repository files and write approved outputs.
+- Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
+  directories, write `config.json`, and preserve existing user files by using a
+  unique suffix when a timestamped workspace already exists.
 - Process adapters run local commands behind deterministic ports.
 - Codex runner adapters invoke external AI workers and return structured raw
   outputs for validation.
@@ -100,6 +105,7 @@ Expected ports include:
 - `ProcessRunner` for local command execution.
 - `AgentRunner` or `CodexRunner` for external worker invocation.
 - `Clock` for timestamps.
+- `RunWorkspaceStore` for creating auditable inspection run workspaces.
 - `Logger` for user-visible and diagnostic messages.
 - `MemoryStore` for local operational swarm memory.
 - `FindingValidator`, `QaValidator`, `KnowledgeCardValidator`, and

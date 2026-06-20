@@ -28,8 +28,8 @@ contract-first baseline:
 
 Runtime CLI implementation has not started. The current source tree does not
 contain CLI argument parsing, repository indexing, orchestration services,
-filesystem adapters, process adapters, Codex runner adapters, memory stores, or
-writer adapters.
+process adapters, Codex runner adapters, memory stores, or writer adapters. A
+filesystem adapter now exists for auditable run workspace creation.
 
 ## Fixed Milestones
 
@@ -251,4 +251,48 @@ git status
 
 ```bash
 feat(validation): wrap JSON schema contracts for runtime use
+```
+
+### Milestone 06: Run Workspace Layout
+
+#### Goal
+
+Create auditable run workspaces for inspection runs.
+
+#### Tasks
+
+- Added a `Clock` port and `RunWorkspaceStore` port so application code can
+  request workspace creation without depending on filesystem APIs.
+- Added `createInspectionRunWorkspace` in the application layer to derive a
+  deterministic `<timestamp>_<repo-name>` workspace name from `RunConfig` and a
+  fakeable clock.
+- Added `NodeRunWorkspaceStore` in the filesystem adapter to create
+  `.inspector-runs/<timestamp>_<repo-name>/`, write `config.json`, and create
+  `input/`, `repo_index/`, `memory/`, `agents/`, `validation/`, `qa/`, and
+  `final/`.
+- Preserved existing user files by allocating a suffixed workspace name when the
+  timestamped folder already exists.
+- Returned a clear error for invalid output paths without deleting existing
+  files.
+
+#### TDD
+
+Added an integration test with temporary directories and a fake clock for the
+basic workspace layout first, then added vertical slices for safe existing
+folder behavior and invalid output paths.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(runs): create auditable inspection workspace
 ```

@@ -18,6 +18,11 @@ Domain and application tests should verify behavior through public interfaces. T
 
 Adapters should be tested with fakes or controlled fixtures. Filesystem, process execution, clock, and Codex runner behavior must sit behind ports so tests remain deterministic.
 
+Run workspace tests use temporary directories and a fake clock. They verify the
+public application function with the filesystem adapter, including required
+folders, `config.json`, safe handling of pre-existing workspace directories,
+and invalid output paths that must not delete user files.
+
 ## Contract Tests
 
 JSON Schema tests validate that example outputs and run artifacts match the
