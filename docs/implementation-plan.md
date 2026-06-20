@@ -36,7 +36,10 @@ runners plus a real Node process runner for local command execution. Agent
 lifecycle transitions are now modeled as an auditable state machine with status
 artifacts written to agent attempt folders. Agent output validation now parses
 raw JSON, selects schemas from agent contracts, reports malformed JSON and
-schema violations, and writes validation reports to the run workspace.
+schema violations, and writes validation reports to the run workspace. Evidence
+validation now checks cited files, line ranges, repository-contained paths,
+high-confidence finding evidence, QA finding references, and knowledge-card
+approved-finding references.
 
 ## Fixed Milestones
 
@@ -727,4 +730,47 @@ git status
 
 ```bash
 feat(validation): validate agent outputs against contracts
+```
+
+### Milestone 17: Evidence Validator
+
+#### Goal
+
+Validate evidence references deterministically.
+
+#### Tasks
+
+- Added a pure application evidence validator that accepts repository file
+  metadata and validated artifacts without reading the filesystem directly.
+- Checked that cited evidence files exist in the inspected repository.
+- Checked that evidence line ranges are valid and satisfy
+  `lineStart <= lineEnd`.
+- Rejected evidence paths that escape the inspected repository, including
+  parent-directory traversal and absolute paths.
+- Required high-confidence findings to include evidence.
+- Checked QA results against existing findings when findings are available.
+- Checked knowledge-card evidence against approved finding ids when approvals
+  are available.
+
+#### TDD
+
+Added integration tests around the public validator for existing file evidence,
+missing files, invalid line ranges, path traversal, high-confidence findings
+without evidence, unknown QA finding references, and invalid knowledge-card
+approved-finding references.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(validation): verify evidence paths and line ranges
 ```

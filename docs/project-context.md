@@ -51,7 +51,10 @@ limit, blocks dependents of failed required agents, and allows continuation
 after optional agent failures. Agent output validation now selects schemas from
 agent contracts, parses JSON output, records malformed JSON and schema
 violations, and writes validation reports under the run workspace for QA and
-retry routing. Runtime CLI behavior is still pending.
+retry routing. Evidence validation now deterministically checks cited repository
+paths, line ranges, high-confidence finding evidence, QA finding references, and
+knowledge-card references to approved findings before semantic QA. Runtime CLI
+behavior is still pending.
 
 ## Non-Goals
 

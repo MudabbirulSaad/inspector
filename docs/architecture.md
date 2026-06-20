@@ -80,7 +80,11 @@ Application responsibilities include:
 - Dispatching specialist agents only when their dependencies are satisfied.
 - Parsing raw agent JSON output and selecting the correct validation contract
   from the agent registry before downstream QA.
-- Accepting only schema-valid and evidence-backed findings.
+- Accepting only schema-valid findings whose evidence paths remain inside the
+  inspected repository and whose cited files and line ranges exist.
+- Checking high-confidence findings for evidence, QA results for known finding
+  references, and knowledge-card evidence for approved finding references before
+  semantic QA.
 - Preserving validation errors in report artifacts so QA and retry routing can
   explain malformed JSON and schema failures.
 - Creating revision requests for failed QA and routing them to the responsible
@@ -143,6 +147,8 @@ Expected ports include:
 - `PromptArtifactWriter` for saving exact run-specific agent prompts.
 - `AgentStatusArtifactWriter` for saving serialized lifecycle status snapshots.
 - `ValidationReportWriter` for saving parse and schema validation reports.
+- `EvidenceValidator` for deterministic file, line-range, and cross-artifact
+  evidence-reference checks before semantic QA.
 - `ArtifactValidator` for schema-backed runtime artifact checks used before
   writing memory or final outputs.
 - `FindingValidator`, `QaValidator`, `KnowledgeCardValidator`, and

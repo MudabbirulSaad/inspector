@@ -71,6 +71,18 @@ The filesystem adapter writes reports to
 reports are intended for later lifecycle transitions, QA review, and retry
 routing.
 
+## Evidence Validation
+
+The application evidence validator performs deterministic reference checks
+before semantic QA. It verifies that cited files exist in the inspected
+repository inventory, line ranges fit within known file line counts,
+`lineStart <= lineEnd`, and evidence paths do not escape the repository.
+
+It also checks cross-artifact references where the relevant context is
+available: high-confidence findings must include evidence, QA results must
+target existing findings, and knowledge-card evidence must reference approved
+findings.
+
 ## Agent Registry Contracts
 
 `src/agents` defines the fixed runtime agent registry. Every registered agent
