@@ -31,9 +31,11 @@ The repository currently contains governance documentation, JSON Schemas, exampl
 ## Non-Goals
 
 - Building a web UI.
+- Operating a hosted service.
 - Storing private prompts or transcripts in public docs.
 - Accepting findings without evidence.
 - Coupling domain logic to a single AI provider or runner implementation.
+- Publishing unreviewed or QA-failed findings in final docs or RAG cards.
 
 ## Documentation Update Rule
 

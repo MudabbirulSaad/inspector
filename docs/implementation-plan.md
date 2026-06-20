@@ -67,3 +67,37 @@ git status
 ```bash
 docs(plan): lock fixed implementation milestones
 ```
+
+### Milestone 01: Architecture Blueprint Reconciliation
+
+#### Goal
+
+Reconcile existing architecture docs into an implementation-ready blueprint
+without creating a competing roadmap.
+
+#### Tasks
+
+- Update existing docs instead of duplicating them.
+- Clearly define hexagonal boundaries, domain responsibilities, application
+  responsibilities, adapter responsibilities, planned ports, agent lifecycle,
+  scheduler DAG, swarm memory rules, QA and revision routing, final docs output,
+  RAG card output, and V1 non-goals.
+- State that agents must follow the fixed milestone plan.
+
+#### TDD
+
+Runtime TDD is not applicable for this milestone because it changes only
+documentation and introduces no executable behavior.
+
+#### Validation
+
+```bash
+npm test
+git status
+```
+
+#### Commit Message
+
+```bash
+docs(architecture): reconcile blueprint for fixed implementation plan
+```
