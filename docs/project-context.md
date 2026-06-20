@@ -56,19 +56,22 @@ paths, positive line ranges, high-confidence finding evidence, QA finding
 references, and knowledge-card references to approved findings before semantic
 QA, while loading line counts only for cited repository files. QA verification
 now reviews candidate findings against schema and evidence reports, rejects
-unsupported or contradictory findings, routes failures to the owner agent with
-revision requests, writes QA artifacts, appends approved/rejected findings to
-run memory, and computes a deterministic readiness score. The runtime CLI slice
-now parses `inspector run`, validates repository and objective paths, wires
-concrete adapters, prints progress, and calls a Scout/Architecture/Pattern
-Miner plus QA application use case. That use case creates a run workspace,
-indexes the repository, initializes memory, builds auditable Scout,
-Architecture, and Pattern Miner prompts, runs Scout before Architecture before
-Pattern Miner through the runner port, validates structured schemas and cited
-evidence, writes artifacts through ports, appends candidate findings from
-schema-valid and evidence-valid outputs, and then produces QA results, QA
-issues, revision requests, approved findings, rejected findings, and readiness
-metadata. Full scheduler-driven multi-agent orchestration is still pending.
+unsupported or contradictory findings, creates owner-agent revision requests,
+writes QA artifacts, appends approved/rejected findings to run memory, and
+computes a deterministic readiness score. The runtime CLI slice now parses
+`inspector run`, validates repository and objective paths, wires concrete
+adapters, prints progress, and calls a Scout/Architecture/Pattern Miner plus QA
+application use case. That use case creates a run workspace, indexes the
+repository, initializes memory, builds auditable Scout, Architecture, and
+Pattern Miner prompts, runs Scout before Architecture before Pattern Miner
+through the runner port, validates structured schemas and cited evidence, writes
+artifacts through ports, appends candidate findings from schema-valid and
+evidence-valid outputs, runs QA, and routes QA revision requests back only to
+the owning agent. Owner retries preserve prior attempts, include the previous
+output and QA issue in the repair prompt, revalidate schema and evidence, update
+memory, rerun QA, and leave unresolved final revision requests visible when the
+retry policy is exhausted. Full scheduler-driven multi-agent orchestration is
+still pending.
 
 ## Non-Goals
 

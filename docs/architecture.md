@@ -109,12 +109,13 @@ Adapter responsibilities include:
   prompts, runs Scout before Architecture before Pattern Miner, validates
   structured schema and cited evidence, writes runtime artifacts through ports,
   appends candidate findings from schema-valid and evidence-valid outputs, then
-  runs deterministic QA verification to produce approved findings, rejected
-  findings, QA results, QA issues, revision requests, and readiness metadata.
-  Shared application step logic handles prompt construction, runner execution,
-  output persistence, and schema validation for these agents. It remains a
-  linear early runtime slice until the full scheduler-driven orchestration flow
-  is wired.
+  runs deterministic QA verification. QA revision requests are grouped by owner
+  agent, routed only to that owner as the next attempt, revalidated against the
+  owner schema and evidence rules, and followed by final QA so unresolved issues
+  remain visible in QA artifacts when retries are exhausted. Shared application
+  step logic handles prompt construction, runner execution, output persistence,
+  and schema validation for these agents. It remains a linear early runtime
+  slice until the full scheduler-driven orchestration flow is wired.
 - Filesystem adapters read target repository files and write approved outputs.
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
@@ -266,7 +267,11 @@ whether a validated finding is accurate, sufficiently supported, and useful.
 When QA fails or requests review, the application creates a revision request that
 records the target finding, failing checks, rationale, required corrections, and
 responsible follow-up agent. Revised outputs must re-enter validation before
-they can affect final artifacts.
+they can affect final artifacts. The current runtime slice routes Scout,
+Architecture, and Pattern Miner revisions back only to the owning agent, stores
+the retry as a separate attempt, includes previous output plus QA issues in the
+repair prompt, revalidates schema and evidence, and leaves final unresolved QA
+issues and revision requests in artifacts when the retry limit is reached.
 
 ## Final Outputs
 

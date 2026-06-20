@@ -623,6 +623,207 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
   );
 });
 
+test("CLI run routes QA revisions only to the owner agent and preserves attempts", async () => {
+  const fixture = await createFixture();
+  const contradictoryArchitectureOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        id: "finding-architecture-uses-ports",
+        claim: "Application orchestration uses ports.",
+      },
+      {
+        ...architectureFinding,
+        id: "finding-architecture-does-not-use-ports",
+        claim: "Application orchestration does not use ports.",
+      },
+    ],
+  };
+  const repairedArchitectureOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        id: "finding-architecture-uses-ports",
+        claim: "Application orchestration uses ports.",
+      },
+    ],
+  };
+  const runner = new FakeAgentRunner({
+    results: [
+      successfulScoutResult(),
+      successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
+      successfulPatternMinerResult(),
+      successfulArchitectureResult(JSON.stringify(repairedArchitectureOutput)),
+    ],
+  });
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(
+    runner.requests.map((request) => [request.agentId, request.attempt]),
+    [
+      ["scout", 1],
+      ["architecture", 1],
+      ["pattern_miner", 1],
+      ["architecture", 2],
+    ],
+  );
+
+  const workspaceRoot = join(
+    fixture.outPath,
+    "2026-06-20T01-02-03-004Z_target-repo",
+  );
+  const retryPrompt = await readFile(
+    join(workspaceRoot, "agents", "architecture", "attempt-2", "prompt.md"),
+    "utf8",
+  );
+  assert.match(retryPrompt, /finding-architecture-does-not-use-ports/);
+  assert.match(retryPrompt, /contradicts/);
+  assert.match(retryPrompt, /Previous Outputs/);
+  assert.match(retryPrompt, /Application orchestration does not use ports/);
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "architecture", "attempt-1", "output.json"),
+        "utf8",
+      ),
+    ),
+    contradictoryArchitectureOutput,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "architecture", "attempt-2", "output.json"),
+        "utf8",
+      ),
+    ),
+    repairedArchitectureOutput,
+  );
+  assert.match(
+    await readFile(
+      join(workspaceRoot, "validation", "architecture", "attempt-2", "report.json"),
+      "utf8",
+    ),
+    /"status": "passed"/,
+  );
+  assert.match(
+    await readFile(
+      join(
+        workspaceRoot,
+        "validation",
+        "architecture",
+        "attempt-2",
+        "evidence.json",
+      ),
+      "utf8",
+    ),
+    /"valid": true/,
+  );
+  assert.equal(
+    JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
+      .readinessScore,
+    100,
+  );
+  assert.match(
+    await readFile(join(workspaceRoot, "memory", "qa_issues.jsonl"), "utf8"),
+    /finding-architecture-does-not-use-ports/,
+  );
+});
+
+test("CLI run respects max retries and leaves unresolved QA issues visible", async () => {
+  const fixture = await createFixture();
+  const contradictoryArchitectureOutput = {
+    ...architectureOutput,
+    findings: [
+      {
+        ...architectureFinding,
+        id: "finding-architecture-uses-ports",
+        claim: "Application orchestration uses ports.",
+      },
+      {
+        ...architectureFinding,
+        id: "finding-architecture-does-not-use-ports",
+        claim: "Application orchestration does not use ports.",
+      },
+    ],
+  };
+  const runner = new FakeAgentRunner({
+    results: [
+      successfulScoutResult(),
+      successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
+      successfulPatternMinerResult(),
+      successfulArchitectureResult(JSON.stringify(contradictoryArchitectureOutput)),
+    ],
+  });
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      fixture.outPath,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(
+    runner.requests.map((request) => [request.agentId, request.attempt]),
+    [
+      ["scout", 1],
+      ["architecture", 1],
+      ["pattern_miner", 1],
+      ["architecture", 2],
+    ],
+  );
+
+  const workspaceRoot = join(
+    fixture.outPath,
+    "2026-06-20T01-02-03-004Z_target-repo",
+  );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "agents", "architecture", "attempt-2", "output.json"),
+        "utf8",
+      ),
+    ),
+    contradictoryArchitectureOutput,
+  );
+  const revisionRequests = JSON.parse(
+    await readFile(join(workspaceRoot, "qa", "revision_requests.json"), "utf8"),
+  ) as unknown[];
+  assert.equal(revisionRequests.length, 2);
+  assert.equal(
+    JSON.parse(await readFile(join(workspaceRoot, "qa", "readiness.json"), "utf8"))
+      .readinessScore,
+    50,
+  );
+  assert.match(
+    await readFile(join(workspaceRoot, "memory", "qa_issues.jsonl"), "utf8"),
+    /contradicts/,
+  );
+});
+
 test("CLI run prints verbose progress and Scout streaming output", async () => {
   const fixture = await createFixture();
   const stdout: string[] = [];

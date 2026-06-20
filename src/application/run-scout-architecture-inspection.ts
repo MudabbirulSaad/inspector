@@ -1,9 +1,10 @@
-import { getAgentContract } from "../agents/index.js";
+import { getAgentContract, type AgentContractId } from "../agents/index.js";
 import type {
   ArchitectureOutput,
   Evidence,
   Finding,
   PatternMinerOutput,
+  RevisionRequest,
   RunConfig,
   ScoutOutput,
 } from "../domain/types.js";
@@ -112,6 +113,7 @@ export async function runScoutArchitectureInspection(
   const candidateFindings: Finding[] = [];
   const schemaReports: QaSchemaReport[] = [];
   const evidenceReports: QaEvidenceReport[] = [];
+  const agentOutputs: Partial<Record<AgentContractId, unknown>> = {};
   await appendSwarmBlackboardSnapshot({
     title: "Run initialized",
     body: `Objective: ${input.objective.trim()}`,
@@ -137,6 +139,7 @@ export async function runScoutArchitectureInspection(
   schemaReports.push({ agentId: "scout", valid: true, errors: [] });
 
   const scoutOutput = scoutSchemaResult.value as ScoutOutput;
+  agentOutputs.scout = scoutOutput;
   const scoutEvidence = scoutEvidenceFindings(scoutOutput);
 
   input.progress?.("Validating Scout evidence");
@@ -186,6 +189,7 @@ export async function runScoutArchitectureInspection(
 
   const architectureOutput =
     architectureSchemaResult.value as ArchitectureOutput;
+  agentOutputs.architecture = architectureOutput;
 
   input.progress?.("Validating Architecture evidence");
   const architectureEvidenceResult = await validateEvidenceForAgent({
@@ -234,6 +238,7 @@ export async function runScoutArchitectureInspection(
 
   const patternMinerOutput =
     patternMinerSchemaResult.value as PatternMinerOutput;
+  agentOutputs.pattern_miner = patternMinerOutput;
 
   input.progress?.("Validating Pattern Miner evidence");
   const patternMinerEvidenceResult = await validateEvidenceForAgent({
@@ -263,7 +268,7 @@ export async function runScoutArchitectureInspection(
   }
 
   input.progress?.("Running QA verification");
-  const qa = await verifyFindingsWithQa({
+  let qa = await verifyFindingsWithQa({
     candidateFindings,
     schemaReports,
     evidenceReports,
@@ -273,6 +278,51 @@ export async function runScoutArchitectureInspection(
     workspace,
     artifacts: input.qaArtifacts,
   });
+
+  for (const issue of qa.qaIssues) {
+    await appendSwarmQaIssue({
+      issue,
+      memory: runMemory,
+      validator: input.validators["qa-issue"],
+    });
+  }
+
+  if (qa.revisionRequests.length > 0) {
+    input.progress?.("Routing QA revisions to owner agents");
+    await routeQaRevisionRequests({
+      input,
+      workspace,
+      runMemory,
+      repoIndexSummary,
+      memorySnapshot,
+      entries,
+      candidateFindings,
+      schemaReports,
+      evidenceReports,
+      agentOutputs,
+      revisionRequests: qa.revisionRequests,
+    });
+
+    input.progress?.("Re-running QA verification after revisions");
+    qa = await verifyFindingsWithQa({
+      candidateFindings,
+      schemaReports,
+      evidenceReports,
+      agentReports: [],
+      memory: memorySnapshot,
+      now: input.clock.now(),
+      workspace,
+      artifacts: input.qaArtifacts,
+    });
+
+    for (const issue of qa.qaIssues) {
+      await appendSwarmQaIssue({
+        issue,
+        memory: runMemory,
+        validator: input.validators["qa-issue"],
+      });
+    }
+  }
 
   for (const finding of qa.approvedFindings) {
     await appendVerifiedSwarmFinding({
@@ -288,14 +338,6 @@ export async function runScoutArchitectureInspection(
       validator: input.validators.finding,
     });
   }
-  for (const issue of qa.qaIssues) {
-    await appendSwarmQaIssue({
-      issue,
-      memory: runMemory,
-      validator: input.validators["qa-issue"],
-    });
-  }
-
   return { workspace };
 }
 
@@ -307,11 +349,14 @@ async function runAgentWorkflowStep(input: {
   repoIndexSummary: unknown;
   memorySnapshot: string;
   previousOutputs: unknown;
+  attempt?: number;
+  revisionRequest?: unknown;
 }): ReturnType<typeof validateAgentOutput> {
   const agent = getAgentContract(input.agentId);
+  const attempt = input.attempt ?? 1;
   const prompt = await buildAgentPrompt({
     agentId: input.agentId,
-    attempt: 1,
+    attempt,
     workspace: input.workspace,
     templates: input.input.promptTemplates,
     artifacts: input.input.promptArtifacts,
@@ -320,16 +365,21 @@ async function runAgentWorkflowStep(input: {
     repoIndexSummary: input.repoIndexSummary,
     previousOutputs: input.previousOutputs,
     memorySnapshot: input.memorySnapshot,
+    revisionRequest: input.revisionRequest,
     outputSchema: await input.input.schemaReader.readAgentOutputSchema(
       agent.outputSchema,
     ),
   });
 
-  input.input.progress?.(`Running ${input.progressName}`);
+  input.input.progress?.(
+    attempt === 1
+      ? `Running ${input.progressName}`
+      : `Running ${input.progressName} revision attempt ${attempt}`,
+  );
   const run = await executeAgentRun({
     runner: input.input.runner,
     agentId: input.agentId,
-    attempt: 1,
+    attempt,
     prompt: prompt.prompt,
     workspaceRoot: input.workspace.root,
     onStreamingEvent: (event) => {
@@ -339,7 +389,7 @@ async function runAgentWorkflowStep(input: {
   await input.input.outputArtifacts.writeAgentOutput({
     workspace: input.workspace,
     agentId: input.agentId,
-    attempt: 1,
+    attempt,
     content: run.stdout,
   });
 
@@ -347,7 +397,7 @@ async function runAgentWorkflowStep(input: {
   return validateAgentOutput({
     workspace: input.workspace,
     agent,
-    attempt: 1,
+    attempt,
     rawOutput: run.stdout,
     validators: input.input.validators,
     reports: input.input.validationReports,
@@ -361,6 +411,7 @@ async function validateEvidenceForAgent(input: {
   entries: RepositoryEntry[];
   findings: Finding[];
   evidenceReports: EvidenceValidationReportWriter;
+  attempt?: number;
 }): Promise<EvidenceValidationResult> {
   const repositoryFiles = await repositoryFilesForEvidence(
     input.repositoryReader,
@@ -375,11 +426,181 @@ async function validateEvidenceForAgent(input: {
   await input.evidenceReports.writeEvidenceValidationReport({
     workspace: input.workspace,
     agentId: input.agentId,
-    attempt: 1,
+    attempt: input.attempt ?? 1,
     content: `${JSON.stringify(result, null, 2)}\n`,
   });
 
   return result;
+}
+
+async function routeQaRevisionRequests(input: {
+  input: RunScoutArchitectureInspectionInput;
+  workspace: RunWorkspace;
+  runMemory: SwarmMemoryStore;
+  repoIndexSummary: unknown;
+  memorySnapshot: string;
+  entries: RepositoryEntry[];
+  candidateFindings: Finding[];
+  schemaReports: QaSchemaReport[];
+  evidenceReports: QaEvidenceReport[];
+  agentOutputs: Partial<Record<AgentContractId, unknown>>;
+  revisionRequests: RevisionRequest[];
+}): Promise<void> {
+  const requestsByOwner = new Map<
+    "scout" | "architecture" | "pattern_miner",
+    RevisionRequest[]
+  >();
+
+  for (const request of input.revisionRequests) {
+    if (
+      request.targetAgent === "scout" ||
+      request.targetAgent === "architecture" ||
+      request.targetAgent === "pattern_miner"
+    ) {
+      requestsByOwner.set(request.targetAgent, [
+        ...(requestsByOwner.get(request.targetAgent) ?? []),
+        request,
+      ]);
+    }
+  }
+
+  for (const [agentId, revisionRequests] of requestsByOwner) {
+    const agent = getAgentContract(agentId);
+    const nextAttempt = 2;
+
+    if (nextAttempt > agent.retryPolicy.maxAttempts) {
+      continue;
+    }
+
+    const schemaResult = await runAgentWorkflowStep({
+      input: input.input,
+      workspace: input.workspace,
+      agentId,
+      progressName: displayNameForAgent(agentId),
+      repoIndexSummary: input.repoIndexSummary,
+      memorySnapshot: input.memorySnapshot,
+      previousOutputs: {
+        previousOwnerOutput: input.agentOutputs[agentId],
+        allPreviousOutputs: input.agentOutputs,
+      },
+      attempt: nextAttempt,
+      revisionRequest: revisionRequests,
+    });
+
+    replaceSchemaReport(input.schemaReports, {
+      agentId,
+      valid: schemaResult.valid,
+      errors: schemaResult.errors.map((error) => ({
+        message: error.message,
+        path: error.path,
+        keyword: error.keyword,
+      })),
+    });
+
+    if (!schemaResult.valid) {
+      continue;
+    }
+
+    const output = schemaResult.value;
+    const findings = findingsForAgentOutput(agentId, output);
+    input.agentOutputs[agentId] = output;
+    replaceCandidateFindingsForAgent(input.candidateFindings, agentId, findings);
+
+    const evidenceResult = await validateEvidenceForAgent({
+      agentId,
+      workspace: input.workspace,
+      repositoryReader: input.input.repositoryReader,
+      entries: input.entries,
+      findings: evidenceFindingsForAgentOutput(agentId, output),
+      evidenceReports: input.input.evidenceReports,
+      attempt: nextAttempt,
+    });
+
+    replaceEvidenceReport(input.evidenceReports, {
+      agentId,
+      valid: evidenceResult.valid,
+      errors: evidenceResult.errors,
+    });
+
+    if (!evidenceResult.valid) {
+      continue;
+    }
+
+    for (const finding of findings) {
+      await appendSwarmFinding({
+        finding,
+        memory: input.runMemory,
+        validator: input.input.validators.finding,
+      });
+    }
+  }
+}
+
+function displayNameForAgent(
+  agentId: "scout" | "architecture" | "pattern_miner",
+): string {
+  return agentId === "pattern_miner"
+    ? "Pattern Miner"
+    : agentId[0]?.toUpperCase() + agentId.slice(1);
+}
+
+function replaceSchemaReport(
+  reports: QaSchemaReport[],
+  next: QaSchemaReport,
+): void {
+  const index = reports.findIndex((report) => report.agentId === next.agentId);
+  if (index === -1) {
+    reports.push(next);
+    return;
+  }
+  reports[index] = next;
+}
+
+function replaceEvidenceReport(
+  reports: QaEvidenceReport[],
+  next: QaEvidenceReport,
+): void {
+  const index = reports.findIndex((report) => report.agentId === next.agentId);
+  if (index === -1) {
+    reports.push(next);
+    return;
+  }
+  reports[index] = next;
+}
+
+function replaceCandidateFindingsForAgent(
+  findings: Finding[],
+  agentId: string,
+  replacements: Finding[],
+): void {
+  const retained = findings.filter((finding) => finding.agent !== agentId);
+  findings.splice(0, findings.length, ...retained, ...replacements);
+}
+
+function findingsForAgentOutput(
+  agentId: "scout" | "architecture" | "pattern_miner",
+  output: unknown,
+): Finding[] {
+  if (agentId === "scout") {
+    return (output as ScoutOutput).findings;
+  }
+  if (agentId === "architecture") {
+    return (output as ArchitectureOutput).findings;
+  }
+  return (output as PatternMinerOutput).findings;
+}
+
+function evidenceFindingsForAgentOutput(
+  agentId: "scout" | "architecture" | "pattern_miner",
+  output: unknown,
+): Finding[] {
+  if (agentId === "scout") {
+    return scoutEvidenceFindings(output as ScoutOutput);
+  }
+  if (agentId === "architecture") {
+    return architectureEvidenceFindings(output as ArchitectureOutput);
+  }
+  return patternMinerEvidenceFindings(output as PatternMinerOutput);
 }
 
 function renderInitialMemorySnapshot(objective: string): string {

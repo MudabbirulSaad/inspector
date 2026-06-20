@@ -1029,3 +1029,53 @@ git status
 ```bash
 feat(qa): verify findings and produce revision requests
 ```
+
+### Milestone 23: QA-Driven Revision Routing
+
+#### Goal
+
+Rerun only the responsible agent when QA requests revision.
+
+#### Tasks
+
+- Grouped QA revision requests by owner agent for the current Scout,
+  Architecture, and Pattern Miner runtime slice.
+- Built retry prompts with the previous owner output, all previous outputs, and
+  the QA issue details from the revision request.
+- Reruns only the responsible owner agent and writes the retry output under
+  `agents/<agent-id>/attempt-2/output.json`, preserving the original attempt.
+- Revalidates the retry output against the owner schema and writes
+  `validation/<agent-id>/attempt-2/report.json`.
+- Revalidates retry evidence and writes
+  `validation/<agent-id>/attempt-2/evidence.json`.
+- Updates candidate findings from the latest schema-valid owner attempt before
+  running final QA again, so unresolved retry evidence or QA issues remain
+  visible.
+- Appends initial and final QA issues to run memory, and appends repaired
+  owner findings only after schema and evidence validation pass.
+- Respects the registry retry policy for the current `maxAttempts: 2` contracts
+  and leaves unresolved final revision requests in QA artifacts when the retry
+  does not repair the issue.
+
+#### TDD
+
+Added CLI integration coverage for owner-only revision routing, retry attempt
+count, repair prompt context, preserved attempt artifacts, retry schema/evidence
+validation, successful repair readiness, max retry behavior, unresolved revision
+requests, and QA issue memory updates.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(orchestrator): route QA failures to owner agents
+```
