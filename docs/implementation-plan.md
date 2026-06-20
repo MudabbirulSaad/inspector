@@ -1582,3 +1582,44 @@ git status
 ```bash
 feat(runs): add status and safe resume
 ```
+
+### Milestone 36: CLI Binary Packaging
+
+#### Goal
+
+Prepare the CLI for local installation and future publishing while keeping the
+package private.
+
+#### Tasks
+
+- Split the importable package surface (`src/index.ts` -> `dist/index.js`) from
+  the executable CLI shim (`src/main.ts` -> `dist/main.js`).
+- Pointed the `inspector` package binary at `dist/main.js`.
+- Kept `"private": true` and added explicit `main`, `exports`, and `files`
+  package metadata for a clean future package shape.
+- Updated the development command to run `tsx src/main.ts`.
+- Added `--help`/`-h` handling that exits successfully without starting an
+  inspection.
+
+#### TDD
+
+Added packaging-focused CLI integration tests one behavior at a time for help
+output, package metadata, built CLI help execution, and the built package export
+surface.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+node dist/main.js --help
+git status
+```
+
+#### Commit Message
+
+```bash
+chore(package): prepare inspector CLI binary
+```

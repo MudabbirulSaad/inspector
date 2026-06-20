@@ -4,11 +4,21 @@
   "description": "CLI for orchestrating Codex-powered codebase inspection swarms.",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "exports": "./dist/index.js",
+  "files": [
+    "dist/",
+    "prompts/",
+    "schemas/",
+    "examples/",
+    "docs/",
+    "README.md"
+  ],
   "bin": {
-    "inspector": "./dist/index.js"
+    "inspector": "./dist/main.js"
   },
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/main.ts",
     "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts tests/unit/*.test.ts tests/integration/*.test.ts tests/e2e/*.test.ts",
     "test:watch": "node --import tsx --test --watch tests/*.test.mjs tests/*.test.ts tests/unit/*.test.ts tests/integration/*.test.ts tests/e2e/*.test.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",

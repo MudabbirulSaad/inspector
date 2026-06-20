@@ -3,6 +3,13 @@
 The CLI entrypoint is `inspector` after `npm run build`. During development, use
 `npm run dev --`.
 
+Show command help:
+
+```bash
+npm run dev -- --help
+node dist/main.js --help
+```
+
 ## Run
 
 Direct repository/objective form:
@@ -65,6 +72,15 @@ place.
 
 Resume fails safely when state is ambiguous, such as a completed stage without
 its output artifact or an invalid lifecycle status.
+
+## Built Entrypoint
+
+After `npm run build`, the executable entrypoint is `dist/main.js` and the
+package export surface is `dist/index.js`.
+
+```bash
+node dist/main.js run <repo-path> --objective <objective-file> --out <output-path>
+```
 
 ## Current Runtime Limits
 

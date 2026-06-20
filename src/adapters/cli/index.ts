@@ -108,6 +108,10 @@ export async function runInspectorCli(
 
   let debug = request.argv.includes("--debug");
   try {
+    if (isHelpRequest(request.argv)) {
+      printHelp(stdout);
+      return { exitCode: 0 };
+    }
     if (request.argv[0] === "status") {
       await printRunStatus(request.argv, stdout);
       return { exitCode: 0 };
@@ -197,6 +201,26 @@ export async function runInspectorCli(
         error instanceof InspectionRunFailedError ? error.workspace : undefined,
     };
   }
+}
+
+function isHelpRequest(argv: string[]): boolean {
+  return argv.length === 0 || argv.includes("--help") || argv.includes("-h");
+}
+
+function printHelp(stdout: (line: string) => void): void {
+  stdout("Usage: inspector <command>");
+  stdout("");
+  stdout("Commands:");
+  stdout("  run <repo-path> --objective <objective-file> --out <output-path>");
+  stdout("  run <inspection.yaml> [--repo <repo-path>] [--objective <objective-file>] [--out <output-path>]");
+  stdout("  status <run-dir>");
+  stdout("  resume <run-dir>");
+  stdout("");
+  stdout("Flags:");
+  stdout("  --verbose");
+  stdout("  --debug");
+  stdout("  --run-quality-commands");
+  stdout("  --help");
 }
 
 const runtimeStageIds = [

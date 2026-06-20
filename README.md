@@ -80,7 +80,7 @@ npm run dev -- resume ./.inspector-runs/<run-directory>
 For package-style usage after building:
 
 ```bash
-node dist/index.js run <repo-path> --objective <objective-file> --out <output-path>
+node dist/main.js run <repo-path> --objective <objective-file> --out <output-path>
 ```
 
 ## Documentation
