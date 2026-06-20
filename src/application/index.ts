@@ -8,6 +8,7 @@ export * from "./append-swarm-memory.js";
 export * from "./build-agent-prompt.js";
 export * from "./execute-agent-run.js";
 export * from "./write-agent-lifecycle-status.js";
+export * from "./schedule-agent-graph.js";
 
 export const applicationBoundary = "application" as const;
 

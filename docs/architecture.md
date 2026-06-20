@@ -198,6 +198,13 @@ Initial scheduling rules:
 
 - Repository indexing must complete before specialist agents run.
 - Specialist agents may run in parallel when they do not depend on each other.
+- Agent graph execution preserves deterministic ready-agent order from the
+  supplied registry or contract list while enforcing a configurable parallelism
+  limit.
+- Dependents are blocked when a required dependency fails.
+- Failed optional dependencies are treated as safe terminal dependencies so
+  downstream work can continue when the dependent agent can tolerate the missing
+  optional output.
 - Finding validation must complete before QA.
 - Failed QA routes to a revision node before final writing.
 - Final case-study and RAG-card writers run only after required findings and QA

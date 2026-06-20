@@ -44,8 +44,11 @@ local CLI command configuration and uses a real process runner for stdout,
 stderr, streaming events, working directory, timeout, and structured result
 handling. Agent lifecycle state is now modeled as an auditable state machine
 with attempt tracking, deterministic status serialization, and filesystem
-status artifacts under each agent attempt folder. Runtime CLI behavior is still
-pending.
+status artifacts under each agent attempt folder. The application layer now
+includes a dependency-aware agent scheduler that runs ready agents in
+deterministic order, executes independent agents in parallel up to a configured
+limit, blocks dependents of failed required agents, and allows continuation
+after optional agent failures. Runtime CLI behavior is still pending.
 
 ## Non-Goals
 

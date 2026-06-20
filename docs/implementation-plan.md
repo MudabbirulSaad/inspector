@@ -647,3 +647,42 @@ git status
 ```bash
 feat(agents): model auditable lifecycle transitions
 ```
+
+### Milestone 15: Dependency-Aware Parallel Scheduler
+
+#### Goal
+
+Schedule agents by dependency graph.
+
+#### Tasks
+
+- Added a pure application scheduler for agent contract graphs.
+- Respected declared dependencies before launching dependent agents.
+- Ran independent ready agents in parallel.
+- Enforced configurable parallelism with deterministic ready-agent launch order.
+- Blocked dependents when required dependencies failed.
+- Allowed safe continuation when optional dependencies failed.
+- Returned completed, failed, and blocked agent id lists for orchestration
+  decisions.
+
+#### TDD
+
+Added scheduler tests one behavior at a time for dependency ordering, parallel
+independent execution, parallelism limits, failed required dependencies,
+optional failures, and deterministic ready-agent order.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(orchestrator): schedule agents with dependency-aware parallelism
+```
