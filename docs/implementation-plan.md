@@ -1412,3 +1412,46 @@ git status
 ```bash
 feat(config): support declarative inspection runs
 ```
+
+### Milestone 31: Safe Command Allowlist
+
+#### Goal
+
+Add safe validation command allowlist.
+
+#### Tasks
+
+- Added an application-level validation command policy that allows only:
+  `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pytest`, and
+  `uv run pytest`.
+- Parsed allowed commands into structured executable plus argument arrays before
+  execution.
+- Rejected unknown commands by default, including destructive, publishing,
+  deployment, and destructive database command examples.
+- Reported shell metacharacters, command chaining, pipes, redirection, and
+  command substitution as dangerous syntax.
+- Added a guarded execution helper that validates a command before delegating to
+  the `ProcessRunner` port, so arbitrary shell strings are not executed.
+
+#### TDD
+
+Added unit tests one behavior at a time for allowed commands, blocked commands,
+unknown commands, dangerous shell syntax, clear errors, and guarded execution
+through the process port.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(security): add validation command allowlist
+```

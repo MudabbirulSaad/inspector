@@ -136,6 +136,11 @@ Adapter responsibilities include:
 - Process adapters run local commands behind deterministic ports, capture
   stdout and stderr, emit stream events, enforce configured timeouts, and return
   structured command results without hardcoded command behavior.
+- Validation command execution is guarded by an application-level allowlist
+  before it reaches the process port. The policy accepts only known safe
+  validation commands, parses them into executable plus argument arrays, rejects
+  unknown commands by default, and reports shell syntax such as command
+  chaining, pipes, redirection, and command substitution as unsafe.
 - Agent runner adapters invoke external AI workers and return structured raw
   outputs, streaming events, artifact paths, timestamps, exit codes, and failure
   reasons for validation. The fake agent runner is deterministic for tests. The
@@ -166,6 +171,8 @@ Expected ports include:
 - `RepositoryIndexer` for producing repository inventory from reader data.
 - `RepositoryIndexWriter` for writing deterministic repository index artifacts.
 - `ProcessRunner` for local command execution.
+- `ValidationCommandPolicy` for allowing only safe validation commands before
+  delegating to `ProcessRunner`.
 - `AgentRunner` for external worker invocation.
 - `Clock` for timestamps.
 - `RunWorkspaceStore` for creating auditable inspection run workspaces.

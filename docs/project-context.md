@@ -42,7 +42,11 @@ is abstracted behind an `AgentRunner` port with deterministic fake and
 process-backed Codex adapters. The process-backed adapter requires explicit
 local CLI command configuration and uses a real process runner for stdout,
 stderr, streaming events, working directory, timeout, and structured result
-handling. Agent lifecycle state is now modeled as an auditable state machine
+handling. Safe validation command execution is now guarded by an application
+allowlist that accepts only known test/typecheck/lint/build/pytest commands,
+parses commands into structured executable and argument arrays, rejects unknown
+commands by default, and blocks shell syntax before delegating to a process
+runner. Agent lifecycle state is now modeled as an auditable state machine
 with attempt tracking, deterministic status serialization, and filesystem
 status artifacts under each agent attempt folder. The application layer now
 includes a dependency-aware agent scheduler that runs ready agents in
