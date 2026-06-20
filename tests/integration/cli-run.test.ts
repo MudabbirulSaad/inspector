@@ -1639,6 +1639,61 @@ test("CLI run sends Scout a prompt containing repository index context and Scout
   assert.match(prompt, /README\.md/);
   assert.match(prompt, /Do not make deep unsupported claims/);
   assert.match(prompt, /projectType/);
+  assert.match(
+    prompt,
+    /Evidence must cite files from the inspected target repository/,
+  );
+  assert.match(prompt, /\.inspector-dogfood/);
+});
+
+test("CLI run keeps Inspector dogfood run artifacts out of Flow Tracer prompt context", async () => {
+  const fixture = await createFixture();
+  const runner = successfulRunner();
+  const dogfoodRun = join(
+    fixture.repoPath,
+    ".inspector-dogfood",
+    "runs",
+    "example",
+  );
+  const outputDirectory = join(fixture.repoPath, ".inspector-dogfood", "runs");
+
+  await mkdir(join(dogfoodRun, "agents", "flow_tracer", "attempt-1"), {
+    recursive: true,
+  });
+  await writeFile(
+    join(dogfoodRun, "agents", "flow_tracer", "attempt-1", "status.json"),
+    "{}\n",
+  );
+  await writeFile(join(dogfoodRun, "config.json"), "{}\n");
+
+  const result = await runInspectorCli({
+    argv: [
+      "run",
+      fixture.repoPath,
+      "--objective",
+      fixture.objectivePath,
+      "--out",
+      outputDirectory,
+    ],
+    clock: fixedClock,
+    runner,
+    stdout: () => undefined,
+  });
+
+  assert.equal(result.exitCode, 0);
+  const flowTracerPrompt =
+    runner.requests.find((request) => request.agentId === "flow_tracer")
+      ?.prompt ?? "";
+
+  assert.match(flowTracerPrompt, /# Agent Prompt: flow_tracer/);
+  assert.match(flowTracerPrompt, /Repository Index Summary/);
+  assert.match(flowTracerPrompt, /README\.md/);
+  assert.doesNotMatch(flowTracerPrompt, /\.inspector-dogfood\/runs/);
+  assert.doesNotMatch(flowTracerPrompt, /agents\/flow_tracer\/attempt-1\/status\.json/);
+  assert.match(
+    flowTracerPrompt,
+    /Do not cite \.inspector-dogfood, \.inspector-runs/,
+  );
 });
 
 test("CLI run sends Architecture a prompt containing Scout output and Architecture rules", async () => {

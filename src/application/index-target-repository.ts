@@ -7,22 +7,14 @@ import type {
 } from "../ports/index.js";
 import { detectRepositoryCommands } from "./detect-repository-commands.js";
 import { detectRepositoryStack } from "./detect-repository-stack.js";
-
-const ignoredRepositoryFolders = new Set([
-  ".agents",
-  ".cache",
-  ".git",
-  ".inspector-runs",
-  ".next",
-  "build",
-  "coverage",
-  "dist",
-  "node_modules",
-  "vendor",
-]);
+import {
+  isIgnoredRepositoryEntry,
+  type RepositoryIgnoreOptions,
+} from "./repository-ignore-rules.js";
 
 export interface IndexTargetRepositoryInput {
   target: RunConfig["target"];
+  outputDirectory?: string;
   reader: RepositoryReader;
   writer: RepositoryIndexWriter;
   workspace: RunWorkspace;
@@ -52,9 +44,13 @@ export async function indexTargetRepository(
   input: IndexTargetRepositoryInput,
 ): Promise<void> {
   const maxFileSizeBytes = input.maxFileSizeBytes ?? 1_000_000;
+  const ignoreOptions: RepositoryIgnoreOptions = {
+    targetRoot: input.target.root,
+    outputDirectory: input.outputDirectory,
+  };
   const entries = [
     ...(await input.reader.listEntries()).filter(
-      (entry) => !isIgnoredEntry(entry),
+      (entry) => !isIgnoredRepositoryEntry(entry, ignoreOptions),
     ),
   ].sort(compareRepositoryEntries);
 
@@ -99,12 +95,6 @@ export async function indexTargetRepository(
       2,
     )}\n`,
   );
-}
-
-function isIgnoredEntry(entry: RepositoryEntry): boolean {
-  return entry.path
-    .split("/")
-    .some((segment) => ignoredRepositoryFolders.has(segment));
 }
 
 function isOversizedFile(

@@ -211,6 +211,137 @@ test("omits local agent operational state from index artifacts", async () => {
   );
 });
 
+test("omits Inspector dogfood run artifacts from all index artifacts", async () => {
+  const reader = new InMemoryRepositoryReader(
+    [
+      { path: ".inspector-dogfood", kind: "directory" },
+      { path: ".inspector-dogfood/runs", kind: "directory" },
+      { path: ".inspector-dogfood/runs/example", kind: "directory" },
+      {
+        path: ".inspector-dogfood/runs/example/agents/flow_tracer/attempt-1/status.json",
+        kind: "file",
+        sizeBytes: 300,
+      },
+      {
+        path: ".inspector-dogfood/runs/example/config.json",
+        kind: "file",
+        sizeBytes: 120,
+      },
+      { path: "README.md", kind: "file", sizeBytes: 120 },
+      { path: "src", kind: "directory" },
+      { path: "src/index.ts", kind: "file", sizeBytes: 42 },
+    ],
+    new Map([
+      [
+        ".inspector-dogfood/runs/example/config.json",
+        JSON.stringify({ target: "example" }),
+      ],
+    ]),
+  );
+  const writer = new InMemoryRepositoryIndexWriter();
+
+  await indexTargetRepository({
+    target: {
+      name: "example-service",
+      root: "/repos/example-service",
+    },
+    reader,
+    writer,
+    workspace,
+  });
+
+  for (const content of writer.files.values()) {
+    assert.doesNotMatch(content, /\.inspector-dogfood/);
+  }
+  assert.equal(
+    writer.files.get("file_tree.txt"),
+    [
+      ".",
+      "README.md",
+      "src/",
+      "src/index.ts",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(JSON.parse(writer.files.get("important_files.json") ?? ""), {
+    files: [
+      {
+        path: "README.md",
+        reason: "repository documentation",
+        sizeBytes: 120,
+      },
+    ],
+  });
+  assert.deepEqual(
+    JSON.parse(writer.files.get("repo_summary.json") ?? "").totals,
+    {
+      files: 2,
+      directories: 1,
+      skippedFiles: 0,
+    },
+  );
+});
+
+test("omits configured output directory inside target root from all index artifacts", async () => {
+  const reader = new InMemoryRepositoryReader(
+    [
+      { path: ".custom-output", kind: "directory" },
+      { path: ".custom-output/runs", kind: "directory" },
+      { path: ".custom-output/runs/example", kind: "directory" },
+      {
+        path: ".custom-output/runs/example/config.json",
+        kind: "file",
+        sizeBytes: 120,
+      },
+      { path: "README.md", kind: "file", sizeBytes: 120 },
+      { path: "src", kind: "directory" },
+      { path: "src/index.ts", kind: "file", sizeBytes: 42 },
+    ],
+    new Map([
+      [
+        ".custom-output/runs/example/config.json",
+        JSON.stringify({ target: "example" }),
+      ],
+    ]),
+  );
+  const writer = new InMemoryRepositoryIndexWriter();
+
+  await indexTargetRepository({
+    target: {
+      name: "example-service",
+      root: "/repos/example-service",
+    },
+    outputDirectory: "/repos/example-service/.custom-output/runs",
+    reader,
+    writer,
+    workspace,
+  });
+
+  for (const content of writer.files.values()) {
+    assert.doesNotMatch(content, /\.custom-output\/runs/);
+  }
+  assert.equal(
+    writer.files.get("file_tree.txt"),
+    [
+      ".",
+      ".custom-output/",
+      "README.md",
+      "src/",
+      "src/index.ts",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(JSON.parse(writer.files.get("important_files.json") ?? ""), {
+    files: [
+      {
+        path: "README.md",
+        reason: "repository documentation",
+        sizeBytes: 120,
+      },
+    ],
+  });
+});
+
 test("detects important repository files for inspection planning", async () => {
   const reader = new InMemoryRepositoryReader(
     [

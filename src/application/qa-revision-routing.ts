@@ -27,6 +27,7 @@ import {
   repositoryFilesForEvidence,
   validateEvidenceReferences,
 } from "./validate-evidence-references.js";
+import type { RepositoryIgnoreOptions } from "./repository-ignore-rules.js";
 import type { QaEvidenceReport, QaSchemaReport } from "./verify-findings-with-qa.js";
 
 export async function routeQaRevisionRequests(input: {
@@ -108,6 +109,10 @@ export async function routeQaRevisionRequests(input: {
       workspace: input.workspace,
       repositoryReader: input.input.repositoryReader,
       entries: input.entries,
+      ignoreOptions: {
+        targetRoot: input.input.config.target.root,
+        outputDirectory: input.input.config.outputDirectory,
+      },
       findings: evidenceFindingsForAgentOutput(agentId, output),
       evidenceReports: input.input.evidenceReports,
       attempt: nextAttempt,
@@ -158,6 +163,7 @@ async function validateEvidenceForAgent(input: {
   workspace: RunWorkspace;
   repositoryReader: RepositoryReader;
   entries: RepositoryEntry[];
+  ignoreOptions?: RepositoryIgnoreOptions;
   findings: Finding[];
   evidenceReports: EvidenceValidationReportWriter;
   attempt?: number;
@@ -166,10 +172,13 @@ async function validateEvidenceForAgent(input: {
     input.repositoryReader,
     input.entries,
     input.findings.flatMap((finding) => finding.evidence),
+    undefined,
+    input.ignoreOptions,
   );
   const result = validateEvidenceReferences({
     repositoryFiles,
     findings: input.findings,
+    ignoreOptions: input.ignoreOptions,
   });
 
   await input.evidenceReports.writeEvidenceValidationReport({

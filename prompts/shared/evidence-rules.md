@@ -1,6 +1,7 @@
 Evidence rules:
 
 - Every finding must cite repository-relative file paths and line ranges.
+- Evidence must cite files from the inspected target repository, not Inspector-generated run workspace artifacts. Do not cite .inspector-dogfood, .inspector-runs, agents/*/status.json, validation/*, final/docs, or final/rag_cards as repository evidence.
 - Evidence must support the exact claim being made.
 - Do not cite generated build output unless the generated artifact is the behavior under review.
 - If a claim cannot be supported with traceable evidence, downgrade it to a question or omit it.

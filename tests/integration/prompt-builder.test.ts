@@ -140,6 +140,12 @@ test("filesystem prompt adapters load repository templates and save exact prompt
   assert.equal(savedPrompt, result.prompt);
   assert.match(savedPrompt, /architecture inspector/i);
   assert.match(savedPrompt, /inspect boundaries/);
+  assert.match(
+    savedPrompt,
+    /Evidence must cite files from the inspected target repository/,
+  );
+  assert.match(savedPrompt, /\.inspector-dogfood/);
+  assert.match(savedPrompt, /\.inspector-runs/);
 });
 
 test("prompt builder reports the missing template path", async () => {

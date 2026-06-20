@@ -5,6 +5,12 @@ import type {
   QaResult,
 } from "../domain/types.js";
 import type { RepositoryEntry, RepositoryReader } from "../ports/index.js";
+import {
+  isIgnoredRepositoryPath,
+  isInspectorRunArtifactPath,
+  normalizeRepositoryPath,
+  type RepositoryIgnoreOptions,
+} from "./repository-ignore-rules.js";
 
 export type EvidenceValidationErrorCode =
   | "missing-file"
@@ -37,6 +43,8 @@ export interface ValidateEvidenceReferencesRequest {
   qaResults?: QaResult[];
   knowledgeCards?: KnowledgeCard[];
   approvedFindingIds?: string[];
+  ignoredArtifactPaths?: readonly string[];
+  ignoreOptions?: RepositoryIgnoreOptions;
 }
 
 export interface EvidenceValidationResult {
@@ -45,29 +53,17 @@ export interface EvidenceValidationResult {
 }
 
 const evidenceTextMaxBytes = 1_000_000;
-const ignoredEvidenceFolders = new Set([
-  ".agents",
-  ".cache",
-  ".git",
-  ".inspector-runs",
-  ".next",
-  "build",
-  "coverage",
-  "dist",
-  "node_modules",
-  "vendor",
-]);
-
 export async function repositoryFilesForEvidence(
   reader: RepositoryReader,
   entries: RepositoryEntry[],
   evidence: Evidence[],
   maxFileSizeBytes = evidenceTextMaxBytes,
+  ignoreOptions: RepositoryIgnoreOptions = {},
 ): Promise<EvidenceRepositoryFile[]> {
   const entryByPath = new Map(
     entries
       .filter((entry) => entry.kind === "file")
-      .filter((entry) => !isIgnoredRepositoryEntry(entry.path))
+      .filter((entry) => !isIgnoredRepositoryPath(entry.path, ignoreOptions))
       .map((entry) => [normalizeRepositoryPath(entry.path), entry]),
   );
   const citedPaths = [
@@ -120,6 +116,13 @@ export async function repositoryFilesForEvidence(
 export function validateEvidenceReferences(
   request: ValidateEvidenceReferencesRequest,
 ): EvidenceValidationResult {
+  const ignoreOptions: RepositoryIgnoreOptions = {
+    ...request.ignoreOptions,
+    ignoredArtifactPaths: [
+      ...(request.ignoreOptions?.ignoredArtifactPaths ?? []),
+      ...(request.ignoredArtifactPaths ?? []),
+    ],
+  };
   const repositoryFiles = new Map(
     request.repositoryFiles.map((file) => [
       normalizeRepositoryPath(file.path),
@@ -135,7 +138,9 @@ export function validateEvidenceReferences(
   const errors: EvidenceValidationError[] = [];
 
   for (const finding of findings) {
-    errors.push(...validateFindingEvidence(finding, repositoryFiles));
+    errors.push(
+      ...validateFindingEvidence(finding, repositoryFiles, ignoreOptions),
+    );
   }
 
   if (request.findings !== undefined) {
@@ -148,6 +153,7 @@ export function validateEvidenceReferences(
         knowledgeCard,
         repositoryFiles,
         approvedFindingIds,
+        ignoreOptions,
       ),
     );
   }
@@ -161,6 +167,7 @@ export function validateEvidenceReferences(
 function validateFindingEvidence(
   finding: Finding,
   repositoryFiles: ReadonlyMap<string, EvidenceRepositoryFile>,
+  ignoreOptions: RepositoryIgnoreOptions,
 ): EvidenceValidationError[] {
   const errors: EvidenceValidationError[] = [];
 
@@ -175,7 +182,13 @@ function validateFindingEvidence(
 
   errors.push(
     ...finding.evidence.flatMap((evidence) =>
-      validateEvidence("finding", finding.id, evidence, repositoryFiles),
+      validateEvidence(
+        "finding",
+        finding.id,
+        evidence,
+        repositoryFiles,
+        ignoreOptions,
+      ),
     ),
   );
 
@@ -201,6 +214,7 @@ function validateKnowledgeCardEvidence(
   knowledgeCard: KnowledgeCard,
   repositoryFiles: ReadonlyMap<string, EvidenceRepositoryFile>,
   approvedFindingIds: ReadonlySet<string> | undefined,
+  ignoreOptions: RepositoryIgnoreOptions,
 ): EvidenceValidationError[] {
   const errors = knowledgeCard.evidence.flatMap((evidence) =>
     validateEvidence(
@@ -208,6 +222,7 @@ function validateKnowledgeCardEvidence(
       knowledgeCard.id,
       evidence,
       repositoryFiles,
+      ignoreOptions,
     ),
   );
 
@@ -241,6 +256,7 @@ function validateEvidence(
   artifactId: string,
   evidence: Evidence,
   repositoryFiles: ReadonlyMap<string, EvidenceRepositoryFile>,
+  ignoreOptions: RepositoryIgnoreOptions,
 ): EvidenceValidationError[] {
   if (!isRepositoryRelativePath(evidence.file)) {
     return [
@@ -258,13 +274,17 @@ function validateEvidence(
   const file = repositoryFiles.get(normalizedPath);
 
   if (file === undefined) {
+    const message = isInspectorRunArtifactPath(normalizedPath, ignoreOptions)
+      ? `Evidence path points to an Inspector-generated run artifact, not a target repository file: ${evidence.file}`
+      : `Evidence file does not exist in repository: ${evidence.file}`;
+
     return [
       {
         code: "missing-file",
         artifactType,
         artifactId,
         evidenceFile: evidence.file,
-        message: `Evidence file does not exist in repository: ${evidence.file}`,
+        message,
       },
     ];
   }
@@ -303,10 +323,6 @@ function validateEvidence(
   return [];
 }
 
-function normalizeRepositoryPath(path: string): string {
-  return path.replaceAll("\\", "/").replace(/^(\.\/)+/, "");
-}
-
 function isRepositoryRelativePath(path: string): boolean {
   const normalizedPath = normalizeRepositoryPath(path);
   const segments = normalizedPath.split("/");
@@ -317,12 +333,6 @@ function isRepositoryRelativePath(path: string): boolean {
     !/^[A-Za-z]:/.test(normalizedPath) &&
     !segments.includes("..")
   );
-}
-
-function isIgnoredRepositoryEntry(path: string): boolean {
-  return normalizeRepositoryPath(path)
-    .split("/")
-    .some((segment) => ignoredEvidenceFolders.has(segment));
 }
 
 function countLines(content: string): number {

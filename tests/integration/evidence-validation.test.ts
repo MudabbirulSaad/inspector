@@ -51,6 +51,57 @@ test("evidence validator rejects cited files that are absent from the repository
   assert.match(result.errors[0]?.message ?? "", /does not exist/);
 });
 
+test("evidence validator rejects Inspector-generated run artifacts with a clear message", () => {
+  const result = validateEvidenceReferences({
+    repositoryFiles: [],
+    findings: [
+      {
+        ...finding,
+        evidence: [
+          {
+            file: ".inspector-dogfood/runs/example/agents/flow_tracer/attempt-1/status.json",
+            lineStart: 1,
+            lineEnd: 1,
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.errors[0]?.code, "missing-file");
+  assert.match(
+    result.errors[0]?.message ?? "",
+    /Inspector-generated run artifact, not a target repository file/,
+  );
+});
+
+test("evidence validator rejects configured output-directory artifacts with a clear message", () => {
+  const result = validateEvidenceReferences({
+    repositoryFiles: [],
+    ignoredArtifactPaths: [".custom-output/runs"],
+    findings: [
+      {
+        ...finding,
+        evidence: [
+          {
+            file: ".custom-output/runs/example/config.json",
+            lineStart: 1,
+            lineEnd: 1,
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.errors[0]?.code, "missing-file");
+  assert.match(
+    result.errors[0]?.message ?? "",
+    /Inspector-generated run artifact, not a target repository file/,
+  );
+});
+
 test("evidence validator rejects line ranges outside the cited file", () => {
   const result = validateEvidenceReferences({
     repositoryFiles: [
@@ -353,6 +404,62 @@ test("evidence file loading ignores local agent operational state", async () => 
         lineEnd: 1,
       },
     ],
+  );
+
+  assert.deepEqual(repositoryFiles, [
+    {
+      path: "src/application/orchestrate.ts",
+      lineCount: 4,
+    },
+  ]);
+  assert.deepEqual(reader.reads, ["src/application/orchestrate.ts"]);
+});
+
+test("evidence file loading ignores Inspector-generated run artifacts and configured output directories", async () => {
+  const reader = new RecordingRepositoryReader({
+    ".inspector-dogfood/runs/example/agents/flow_tracer/attempt-1/status.json":
+      "{}\n",
+    ".custom-output/runs/example/config.json": "{}\n",
+    "src/application/orchestrate.ts": "one\ntwo\nthree\nfour\n",
+  });
+  const repositoryFiles = await repositoryFilesForEvidence(
+    reader,
+    [
+      {
+        path: ".inspector-dogfood/runs/example/agents/flow_tracer/attempt-1/status.json",
+        kind: "file",
+        sizeBytes: 3,
+      },
+      {
+        path: ".custom-output/runs/example/config.json",
+        kind: "file",
+        sizeBytes: 3,
+      },
+      {
+        path: "src/application/orchestrate.ts",
+        kind: "file",
+        sizeBytes: 16,
+      },
+    ],
+    [
+      {
+        file: ".inspector-dogfood/runs/example/agents/flow_tracer/attempt-1/status.json",
+        lineStart: 1,
+        lineEnd: 1,
+      },
+      {
+        file: ".custom-output/runs/example/config.json",
+        lineStart: 1,
+        lineEnd: 1,
+      },
+      {
+        file: "src/application/orchestrate.ts",
+        lineStart: 1,
+        lineEnd: 1,
+      },
+    ],
+    undefined,
+    { ignoredArtifactPaths: [".custom-output/runs"] },
   );
 
   assert.deepEqual(repositoryFiles, [

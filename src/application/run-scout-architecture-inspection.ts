@@ -68,6 +68,7 @@ import {
   repositoryFilesForEvidence,
   validateEvidenceReferences,
 } from "./validate-evidence-references.js";
+import type { RepositoryIgnoreOptions } from "./repository-ignore-rules.js";
 import {
   type QaEvidenceReport,
   type QaSchemaReport,
@@ -132,6 +133,7 @@ export async function runScoutArchitectureInspection(
   input.progress?.("Repository indexing started");
   await indexTargetRepository({
     target: input.config.target,
+    outputDirectory: input.config.outputDirectory,
     reader: input.repositoryReader,
     writer: input.repositoryIndexWriter,
     workspace,
@@ -204,6 +206,10 @@ export async function runScoutArchitectureInspection(
     workspace,
     repositoryReader: input.repositoryReader,
     entries,
+    ignoreOptions: {
+      targetRoot: input.config.target.root,
+      outputDirectory: input.config.outputDirectory,
+    },
     findings: scoutEvidence,
     evidenceReports: input.evidenceReports,
   });
@@ -262,6 +268,10 @@ export async function runScoutArchitectureInspection(
     workspace,
     repositoryReader: input.repositoryReader,
     entries,
+    ignoreOptions: {
+      targetRoot: input.config.target.root,
+      outputDirectory: input.config.outputDirectory,
+    },
     findings: architectureEvidenceFindings(architectureOutput),
     evidenceReports: input.evidenceReports,
   });
@@ -320,6 +330,10 @@ export async function runScoutArchitectureInspection(
     workspace,
     repositoryReader: input.repositoryReader,
     entries,
+    ignoreOptions: {
+      targetRoot: input.config.target.root,
+      outputDirectory: input.config.outputDirectory,
+    },
     findings: patternMinerEvidenceFindings(patternMinerOutput),
     evidenceReports: input.evidenceReports,
   });
@@ -381,6 +395,10 @@ export async function runScoutArchitectureInspection(
     workspace,
     repositoryReader: input.repositoryReader,
     entries,
+    ignoreOptions: {
+      targetRoot: input.config.target.root,
+      outputDirectory: input.config.outputDirectory,
+    },
     findings: flowTracerEvidenceFindings(flowTracerOutput),
     evidenceReports: input.evidenceReports,
   });
@@ -446,6 +464,10 @@ export async function runScoutArchitectureInspection(
     workspace,
     repositoryReader: input.repositoryReader,
     entries,
+    ignoreOptions: {
+      targetRoot: input.config.target.root,
+      outputDirectory: input.config.outputDirectory,
+    },
     findings: testingStrategyEvidenceFindings(testingStrategyOutput),
     evidenceReports: input.evidenceReports,
   });
@@ -510,6 +532,10 @@ export async function runScoutArchitectureInspection(
     workspace,
     repositoryReader: input.repositoryReader,
     entries,
+    ignoreOptions: {
+      targetRoot: input.config.target.root,
+      outputDirectory: input.config.outputDirectory,
+    },
     findings: tradeoffAnalystEvidenceFindings(tradeoffAnalystOutput),
     evidenceReports: input.evidenceReports,
   });
@@ -680,6 +706,7 @@ export async function validateEvidenceForAgent(input: {
   workspace: RunWorkspace;
   repositoryReader: RepositoryReader;
   entries: RepositoryEntry[];
+  ignoreOptions?: RepositoryIgnoreOptions;
   findings: Finding[];
   evidenceReports: EvidenceValidationReportWriter;
   attempt?: number;
@@ -688,10 +715,13 @@ export async function validateEvidenceForAgent(input: {
     input.repositoryReader,
     input.entries,
     input.findings.flatMap((finding) => finding.evidence),
+    undefined,
+    input.ignoreOptions,
   );
   const result = validateEvidenceReferences({
     repositoryFiles,
     findings: input.findings,
+    ignoreOptions: input.ignoreOptions,
   });
 
   await input.evidenceReports.writeEvidenceValidationReport({
