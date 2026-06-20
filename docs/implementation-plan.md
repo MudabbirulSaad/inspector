@@ -430,3 +430,45 @@ git status
 ```bash
 feat(memory): add append-only swarm memory store
 ```
+
+### Milestone 10: Agent Registry and Contracts
+
+#### Goal
+
+Define fixed agent contracts.
+
+#### Tasks
+
+- Added a fixed registry in `src/agents` for required V1 agents: `scout`,
+  `architecture`, `pattern_miner`, `qa_verifier`, and `final_reviewer`.
+- Added optional later agent contracts for `flow_tracer`, `testing_strategy`,
+  `tradeoff_analyst`, and `rag_card_distiller`.
+- Defined each contract with id, role, description, dependencies, output
+  artifacts, output schema, retry policy, required/optional policy, and QA
+  revision ownership.
+- Exposed public registry helpers for listing contracts, resolving one
+  contract by id, and deriving a dependency graph for scheduling.
+- Kept registry order deterministic so orchestration and tests have stable
+  execution inputs.
+
+#### TDD
+
+Added agent registry tests one behavior at a time for known V1 agents, unknown
+agent rejection, dependency graph output, required/optional policy, deterministic
+registry order, and contract completeness.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(agents): define registry and execution contracts
+```

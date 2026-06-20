@@ -56,3 +56,13 @@ The runtime validation adapter in `src/validation` wraps the existing schema
 files for use by orchestrator, CLI, and test callers. It currently exposes
 validators for findings, QA results, knowledge cards, memory events, and
 inspection reports without duplicating schema definitions in TypeScript.
+
+## Agent Registry Contracts
+
+`src/agents` defines the fixed runtime agent registry. Every registered agent
+declares its id, role, description, dependencies, output artifacts, output
+schema, retry policy, required/optional policy, and QA revision ownership.
+
+The required V1 agents are `scout`, `architecture`, `pattern_miner`,
+`qa_verifier`, and `final_reviewer`. Later optional agents are `flow_tracer`,
+`testing_strategy`, `tradeoff_analyst`, and `rag_card_distiller`.

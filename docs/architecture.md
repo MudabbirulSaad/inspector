@@ -145,6 +145,31 @@ An inspection agent moves through these application-owned stages:
 Agents produce findings and supporting material. The orchestrator owns lifecycle
 state and workflow transitions.
 
+## Agent Registry
+
+The source registry in `src/agents` is the fixed contract source for runtime
+inspection agents. Each contract defines the agent id, role, description,
+dependencies, output artifact paths, output schema, retry policy,
+required/optional policy, and QA revision ownership.
+
+V1 requires these agents in deterministic order:
+
+- `scout`
+- `architecture`
+- `pattern_miner`
+- `qa_verifier`
+- `final_reviewer`
+
+Later optional agents are registered but not required for the V1 execution set:
+
+- `flow_tracer`
+- `testing_strategy`
+- `tradeoff_analyst`
+- `rag_card_distiller`
+
+Scheduler code should consume the registry or derived dependency graph rather
+than hardcoding agent ids in orchestration logic.
+
 ## Scheduler DAG
 
 The scheduler should model inspection work as a directed acyclic graph. Nodes
