@@ -1455,3 +1455,45 @@ git status
 ```bash
 feat(security): add validation command allowlist
 ```
+
+### Milestone 32: Quality Command Runner
+
+#### Goal
+
+Run safe quality commands and record results.
+
+#### Tasks
+
+- Added a quality command runner that selects detected `test`, `typecheck`,
+  `lint`, and `build` commands only.
+- Reused the validation command allowlist before every process execution, so
+  unknown commands and shell syntax are recorded as blocked and are never
+  delegated to the process runner.
+- Captured command, args, exit code, stdout, stderr, duration, and status for
+  passed, failed, blocked, and timed-out commands.
+- Added a `QualityCommandReportWriter` port and filesystem adapter that writes
+  `validation/command_report.json`.
+- Wired runtime inspection runs to execute detected safe quality commands after
+  repository indexing and before agent execution.
+
+#### TDD
+
+Added integration tests one behavior at a time for successful command execution,
+failed commands, blocked commands, timeout status, filesystem report writing,
+and CLI workspace artifact creation without depending on external projects.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(validation): execute safe quality commands
+```

@@ -25,6 +25,7 @@ import {
   NodeQaArtifactWriter,
   NodePromptArtifactWriter,
   NodePromptTemplateReader,
+  NodeQualityCommandReportWriter,
   NodeRagKnowledgeCardWriter,
   NodeRepositoryIndexPromptContextReader,
   NodeRepositoryIndexWriter,
@@ -106,6 +107,7 @@ export async function runInspectorCli(
     const repoRoot = resolve(command.repoPath);
     const repositoryReader = new NodeRepositoryReader(repoRoot);
     const repositoryEntries = await repositoryReader.listEntries();
+    const processRunner = new NodeProcessRunner();
     const config: RunConfig = {
       target: {
         name: basename(repoRoot),
@@ -145,8 +147,10 @@ export async function runInspectorCli(
       validationReports: new NodeValidationReportWriter(),
       evidenceReports: new NodeEvidenceValidationReportWriter(),
       qaArtifacts: new NodeQaArtifactWriter(),
+      qualityCommandReports: new NodeQualityCommandReportWriter(),
       finalDocs: new NodeCaseStudyDocumentWriter(),
       ragCards: new NodeRagKnowledgeCardWriter(),
+      processRunner,
       validators: await createSchemaContractValidators(),
       schemaReader: new NodeAgentOutputSchemaReader(schemaRoot),
       progress: (message) => printProgress(stdout, command.verbose, message),

@@ -107,6 +107,13 @@ export interface ValidationReportWriter {
   }): Promise<{ path: string }>;
 }
 
+export interface QualityCommandReportWriter {
+  writeQualityCommandReport(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }>;
+}
+
 export interface EvidenceValidationReportWriter {
   writeEvidenceValidationReport(request: {
     workspace: RunWorkspace;

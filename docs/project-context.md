@@ -46,9 +46,13 @@ handling. Safe validation command execution is now guarded by an application
 allowlist that accepts only known test/typecheck/lint/build/pytest commands,
 parses commands into structured executable and argument arrays, rejects unknown
 commands by default, and blocks shell syntax before delegating to a process
-runner. Agent lifecycle state is now modeled as an auditable state machine
-with attempt tracking, deterministic status serialization, and filesystem
-status artifacts under each agent attempt folder. The application layer now
+runner. Runtime inspection runs now execute detected safe quality commands for
+test, typecheck, lint, and build through the process port and write
+`validation/command_report.json` with command arguments, exit code, stdout,
+stderr, duration, and passed/failed/blocked/timeout status. Agent lifecycle
+state is now modeled as an auditable state machine with attempt tracking,
+deterministic status serialization, and filesystem status artifacts under each
+agent attempt folder. The application layer now
 includes a dependency-aware agent scheduler that runs ready agents in
 deterministic order, executes independent agents in parallel up to a configured
 limit, blocks dependents of failed required agents, and allows continuation

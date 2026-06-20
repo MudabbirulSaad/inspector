@@ -1174,6 +1174,15 @@ test("CLI run writes repository, memory, schema, and evidence artifacts", async 
     ),
     /"status": "passed"/,
   );
+  assert.deepEqual(
+    JSON.parse(
+      await readFile(
+        join(workspaceRoot, "validation", "command_report.json"),
+        "utf8",
+      ),
+    ),
+    { commands: [] },
+  );
   assert.match(
     await readFile(
       join(workspaceRoot, "validation", "scout", "attempt-1", "evidence.json"),

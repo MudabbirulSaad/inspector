@@ -21,6 +21,8 @@ import type {
   PromptArtifactWriter,
   PromptTemplateReader,
   QaArtifactWriter,
+  QualityCommandReportWriter,
+  ProcessRunner,
   RagKnowledgeCardWriter,
   RepositoryEntry,
   RepositoryIndexPromptContextReader,
@@ -45,6 +47,11 @@ import { executeAgentRun } from "./execute-agent-run.js";
 import { generateCaseStudyDocumentation } from "./generate-case-study-documentation.js";
 import { generateRagKnowledgeCards } from "./generate-rag-knowledge-cards.js";
 import { indexTargetRepository } from "./index-target-repository.js";
+import { detectRepositoryCommands } from "./detect-repository-commands.js";
+import {
+  runQualityCommands,
+  writeQualityCommandReport,
+} from "./run-quality-commands.js";
 import { validateAgentOutput } from "./validate-agent-output.js";
 import {
   type EvidenceValidationResult,
@@ -73,8 +80,10 @@ export interface RunScoutArchitectureInspectionInput {
   validationReports: ValidationReportWriter;
   evidenceReports: EvidenceValidationReportWriter;
   qaArtifacts: QaArtifactWriter;
+  qualityCommandReports: QualityCommandReportWriter;
   finalDocs: CaseStudyDocumentWriter;
   ragCards: RagKnowledgeCardWriter;
+  processRunner: ProcessRunner;
   validators: SchemaContractValidators;
   schemaReader: AgentOutputSchemaReader;
   progress?: (message: string) => void;
@@ -115,6 +124,27 @@ export async function runScoutArchitectureInspection(
     workspace,
   });
   input.progress?.("Repository indexing finished");
+
+  input.progress?.("Validation command execution started");
+  const detectedCommands = await detectRepositoryCommands(
+    input.repositoryReader,
+    entries,
+  );
+  const commandReport = await runQualityCommands({
+    detectedCommands,
+    cwd: input.config.target.root,
+    runner: input.processRunner,
+    ...(input.config.runner?.timeoutMs === undefined
+      ? {}
+      : { timeoutMs: input.config.runner.timeoutMs }),
+  });
+  await writeQualityCommandReport({
+    workspace,
+    report: commandReport,
+    writer: input.qualityCommandReports,
+  });
+  input.progress?.("Validation command execution finished");
+
   const repoIndexSummary =
     await input.repositoryIndexContext.readRepositoryIndexPromptContext(workspace);
 

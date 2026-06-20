@@ -141,6 +141,10 @@ Adapter responsibilities include:
   validation commands, parses them into executable plus argument arrays, rejects
   unknown commands by default, and reports shell syntax such as command
   chaining, pipes, redirection, and command substitution as unsafe.
+- Quality command execution runs only detected safe test, typecheck, lint, and
+  build commands through the process port, records blocked commands without
+  executing them, distinguishes timeout results, and writes the deterministic
+  `validation/command_report.json` artifact under the run workspace.
 - Agent runner adapters invoke external AI workers and return structured raw
   outputs, streaming events, artifact paths, timestamps, exit codes, and failure
   reasons for validation. The fake agent runner is deterministic for tests. The

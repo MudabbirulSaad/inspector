@@ -10,6 +10,7 @@ import type {
   PromptArtifactWriter,
   PromptTemplateReader,
   QaArtifactWriter,
+  QualityCommandReportWriter,
   RagKnowledgeCardStream,
   RagKnowledgeCardWriter,
   RepositoryEntry,
@@ -156,6 +157,23 @@ export class NodeSwarmMemoryStore implements SwarmMemoryStore {
     for (const file of allMemoryFiles) {
       await writeFile(join(this.workspace.folders.memory, file), "", { flag: "a" });
     }
+  }
+}
+
+export class NodeQualityCommandReportWriter
+  implements QualityCommandReportWriter
+{
+  async writeQualityCommandReport(request: {
+    workspace: RunWorkspace;
+    content: string;
+  }): Promise<{ path: string }> {
+    await mkdir(request.workspace.folders.validation, { recursive: true });
+    const path = join(
+      request.workspace.folders.validation,
+      "command_report.json",
+    );
+    await writeFile(path, request.content);
+    return { path };
   }
 }
 
