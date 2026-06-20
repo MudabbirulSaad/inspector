@@ -32,3 +32,19 @@ export interface RunWorkspace {
 export interface RunWorkspaceStore {
   create(request: RunWorkspaceRequest): Promise<RunWorkspace>;
 }
+
+export type RepositoryEntryKind = "file" | "directory";
+
+export interface RepositoryEntry {
+  path: string;
+  kind: RepositoryEntryKind;
+  sizeBytes?: number;
+}
+
+export interface RepositoryReader {
+  listEntries(): Promise<RepositoryEntry[]>;
+}
+
+export interface RepositoryIndexWriter {
+  writeText(directory: string, path: string, content: string): Promise<void>;
+}

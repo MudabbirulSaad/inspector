@@ -1,7 +1,10 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+  RepositoryEntry,
+  RepositoryIndexWriter,
+  RepositoryReader,
   RunWorkspace,
   RunWorkspaceRequest,
   RunWorkspaceStore,
@@ -41,6 +44,59 @@ export class NodeRunWorkspaceStore implements RunWorkspaceStore {
         { cause: error },
       );
     }
+  }
+}
+
+export class NodeRepositoryReader implements RepositoryReader {
+  constructor(private readonly root: string) {}
+
+  async listEntries(): Promise<RepositoryEntry[]> {
+    return this.walkDirectory("");
+  }
+
+  private async walkDirectory(relativeDirectory: string): Promise<RepositoryEntry[]> {
+    const absoluteDirectory =
+      relativeDirectory.length === 0
+        ? this.root
+        : join(this.root, relativeDirectory);
+    const dirents = await readdir(absoluteDirectory, { withFileTypes: true });
+    const entries: RepositoryEntry[] = [];
+
+    for (const dirent of dirents) {
+      const relativePath =
+        relativeDirectory.length === 0
+          ? dirent.name
+          : `${relativeDirectory}/${dirent.name}`;
+      const absolutePath = join(this.root, relativePath);
+
+      if (dirent.isDirectory()) {
+        entries.push({ path: relativePath, kind: "directory" });
+        entries.push(...(await this.walkDirectory(relativePath)));
+        continue;
+      }
+
+      if (dirent.isFile()) {
+        const metadata = await stat(absolutePath);
+        entries.push({
+          path: relativePath,
+          kind: "file",
+          sizeBytes: metadata.size,
+        });
+      }
+    }
+
+    return entries;
+  }
+}
+
+export class NodeRepositoryIndexWriter implements RepositoryIndexWriter {
+  async writeText(
+    directory: string,
+    path: string,
+    content: string,
+  ): Promise<void> {
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, path), content);
   }
 }
 

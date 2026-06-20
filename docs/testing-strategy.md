@@ -23,6 +23,12 @@ public application function with the filesystem adapter, including required
 folders, `config.json`, safe handling of pre-existing workspace directories,
 and invalid output paths that must not delete user files.
 
+Repository indexer tests use in-memory repository and writer ports for
+application behavior, then temporary fixture repositories for the filesystem
+adapter. They cover tree rendering, noisy-folder ignores, important file
+detection, huge-file skipping, and stable ordering through the public indexer
+use case.
+
 ## Contract Tests
 
 JSON Schema tests validate that example outputs and run artifacts match the

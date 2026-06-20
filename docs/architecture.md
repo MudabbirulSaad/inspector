@@ -67,6 +67,8 @@ Application responsibilities include:
 - Owning workflow control and scheduler decisions.
 - Creating auditable run workspace requests through ports before runtime
   artifacts are written.
+- Building deterministic repository index artifacts from repository metadata
+  gathered through repository access ports.
 - Building the repository inspection plan from indexed repository metadata.
 - Dispatching specialist agents only when their dependencies are satisfied.
 - Accepting only schema-valid and evidence-backed findings.
@@ -87,6 +89,10 @@ Adapter responsibilities include:
 - Filesystem workspace adapters create `.inspector-runs/<timestamp>_<repo-name>/`
   directories, write `config.json`, and preserve existing user files by using a
   unique suffix when a timestamped workspace already exists.
+- Filesystem repository adapters walk target repositories, provide
+  repository-relative file metadata to the application layer, and write
+  approved `repo_index/` artifacts without leaking Node filesystem APIs into the
+  core.
 - Process adapters run local commands behind deterministic ports.
 - Codex runner adapters invoke external AI workers and return structured raw
   outputs for validation.
@@ -102,6 +108,7 @@ Expected ports include:
 
 - `RepositoryReader` for repository metadata and file content.
 - `RepositoryIndexer` for producing repository inventory from reader data.
+- `RepositoryIndexWriter` for writing deterministic repository index artifacts.
 - `ProcessRunner` for local command execution.
 - `AgentRunner` or `CodexRunner` for external worker invocation.
 - `Clock` for timestamps.

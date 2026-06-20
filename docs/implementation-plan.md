@@ -27,9 +27,10 @@ contract-first baseline:
 - Package scripts for tests, type checking, build, and aggregate validation.
 
 Runtime CLI implementation has not started. The current source tree does not
-contain CLI argument parsing, repository indexing, orchestration services,
-process adapters, Codex runner adapters, memory stores, or writer adapters. A
-filesystem adapter now exists for auditable run workspace creation.
+contain CLI argument parsing, orchestration services, process adapters, Codex
+runner adapters, memory stores, or final writer adapters. Filesystem adapters
+now exist for auditable run workspace creation and deterministic repository
+indexing.
 
 ## Fixed Milestones
 
@@ -295,4 +296,47 @@ git status
 
 ```bash
 feat(runs): create auditable inspection workspace
+```
+
+### Milestone 07: Repository Indexer
+
+#### Goal
+
+Implement deterministic repository indexing.
+
+#### Tasks
+
+- Added repository access and repository index writer ports.
+- Added `indexTargetRepository` in the application layer to produce
+  `file_tree.txt`, `repo_summary.json`, and `important_files.json`.
+- Ignored noisy repository folders such as `.git`, `node_modules`, `dist`,
+  `build`, `coverage`, `.next`, `.cache`, and `vendor`.
+- Detected important repository files for inspection planning, including
+  repository guidance, documentation, package manifests, tooling
+  configuration, and schema contracts.
+- Kept output ordering stable and marked oversized files as skipped instead of
+  treating their contents as important-file material.
+- Added filesystem adapters that walk target repositories and write artifacts
+  into `repo_index/`.
+
+#### TDD
+
+Added repository indexer tests one behavior at a time: artifact creation,
+ignore rules, important-file detection, huge-file handling, stable ordering,
+and filesystem adapter integration with fixture repositories.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(repo): index target repositories deterministically
 ```
