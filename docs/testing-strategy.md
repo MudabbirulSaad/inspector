@@ -30,6 +30,12 @@ detection, huge-file skipping, stable ordering, Node package script command
 detection, package-manager lockfile detection, missing command categories, and
 stack signals through the public indexer use case.
 
+Swarm memory tests use temporary run workspaces and the filesystem memory
+adapter through public application functions. They cover append-only JSONL
+events, ordering, findings, QA issues, verified/rejected finding streams,
+decision records, blackboard snapshots, and invalid event rejection before any
+partial write.
+
 ## Contract Tests
 
 JSON Schema tests validate that example outputs and run artifacts match the
@@ -39,8 +45,9 @@ or memory.
 
 Runtime validation tests exercise the public validator adapter in
 `src/validation`. They validate known-good examples for findings, QA results,
-knowledge cards, memory events, and inspection reports, and verify that invalid
-artifacts return clear contract, path, keyword, and message details.
+knowledge cards, memory events, QA issues, and inspection reports, and verify
+that invalid artifacts return clear contract, path, keyword, and message
+details.
 
 ## Type Checking
 

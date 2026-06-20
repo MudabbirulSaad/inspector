@@ -71,6 +71,8 @@ Application responsibilities include:
   gathered through repository access ports.
 - Detecting project stack signals and quality commands from repository manifests
   and workflow files so later planning can choose validation commands.
+- Appending schema-valid swarm memory artifacts into the current run workspace
+  through memory ports.
 - Building the repository inspection plan from indexed repository metadata.
 - Dispatching specialist agents only when their dependencies are satisfied.
 - Accepting only schema-valid and evidence-backed findings.
@@ -99,7 +101,8 @@ Adapter responsibilities include:
 - Codex runner adapters invoke external AI workers and return structured raw
   outputs for validation.
 - Memory adapters persist local swarm events without exposing raw prompts,
-  transcripts, secrets, or private state in public docs.
+  transcripts, secrets, or private state in public docs. Run memory is
+  append-only and lives under the run workspace `memory/` folder.
 - Validator adapters apply JSON Schema and contract validation.
 - Writer adapters emit final case-study Markdown, inspection reports, and
   RAG-ready knowledge cards.
@@ -117,6 +120,8 @@ Expected ports include:
 - `RunWorkspaceStore` for creating auditable inspection run workspaces.
 - `Logger` for user-visible and diagnostic messages.
 - `MemoryStore` for local operational swarm memory.
+- `ArtifactValidator` for schema-backed runtime artifact checks used before
+  writing memory or final outputs.
 - `FindingValidator`, `QaValidator`, `KnowledgeCardValidator`, and
   `InspectionReportValidator` for contract checks.
 - `Scheduler` for dependency-aware agent execution decisions.

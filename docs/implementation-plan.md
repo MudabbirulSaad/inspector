@@ -384,3 +384,49 @@ git status
 ```bash
 feat(repo): detect project stack and quality commands
 ```
+
+### Milestone 09: Append-Only Swarm Memory
+
+#### Goal
+
+Implement local run memory.
+
+#### Tasks
+
+- Added a `SwarmMemoryStore` port and filesystem-backed
+  `NodeSwarmMemoryStore` adapter for run-local memory artifacts.
+- Created append-only run memory files under the workspace `memory/` folder:
+  `blackboard.md`, `events.jsonl`, `findings.jsonl`, `decisions.jsonl`,
+  `qa_issues.jsonl`, `verified_findings.jsonl`, and
+  `rejected_findings.jsonl`.
+- Added application functions for appending memory events, decision events,
+  findings, verified findings, rejected findings, QA issues, and blackboard
+  snapshots.
+- Kept runtime swarm memory separate from `.agents/memory.md`, which remains
+  local developer workflow memory.
+- Validated schema-backed JSONL entries before writes where schemas exist,
+  including memory events, findings, and QA issues.
+- Preserved append ordering and rejected invalid memory events before creating
+  partial JSONL records.
+
+#### TDD
+
+Added swarm memory integration tests one behavior at a time for event appends,
+append ordering, findings and QA issues, blackboard snapshots, decision
+records, verified/rejected findings, and invalid event rejection.
+
+#### Validation
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+git status
+```
+
+#### Commit Message
+
+```bash
+feat(memory): add append-only swarm memory store
+```

@@ -8,6 +8,8 @@ import type {
   RunWorkspace,
   RunWorkspaceRequest,
   RunWorkspaceStore,
+  SwarmMemoryStore,
+  SwarmMemoryStream,
 } from "../../ports/index.js";
 
 export const filesystemAdapterBoundary = "adapters.filesystem" as const;
@@ -21,6 +23,17 @@ const workspaceFolders = [
   "qa",
   "final",
 ] as const;
+
+const memoryFiles = {
+  events: "events.jsonl",
+  findings: "findings.jsonl",
+  decisions: "decisions.jsonl",
+  qaIssues: "qa_issues.jsonl",
+  verifiedFindings: "verified_findings.jsonl",
+  rejectedFindings: "rejected_findings.jsonl",
+} as const satisfies Record<SwarmMemoryStream, string>;
+
+const allMemoryFiles = ["blackboard.md", ...Object.values(memoryFiles)] as const;
 
 export class NodeRunWorkspaceStore implements RunWorkspaceStore {
   async create(request: RunWorkspaceRequest): Promise<RunWorkspace> {
@@ -101,6 +114,36 @@ export class NodeRepositoryIndexWriter implements RepositoryIndexWriter {
   ): Promise<void> {
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, path), content);
+  }
+}
+
+export class NodeSwarmMemoryStore implements SwarmMemoryStore {
+  constructor(private readonly workspace: RunWorkspace) {}
+
+  async appendJsonLine(stream: SwarmMemoryStream, value: unknown): Promise<void> {
+    await this.ensureMemoryFiles();
+    await writeFile(
+      join(this.workspace.folders.memory, memoryFiles[stream]),
+      `${JSON.stringify(value)}\n`,
+      { flag: "a" },
+    );
+  }
+
+  async appendBlackboardSection(markdown: string): Promise<void> {
+    await this.ensureMemoryFiles();
+    await writeFile(
+      join(this.workspace.folders.memory, "blackboard.md"),
+      markdown.endsWith("\n") ? markdown : `${markdown}\n`,
+      { flag: "a" },
+    );
+  }
+
+  private async ensureMemoryFiles(): Promise<void> {
+    await mkdir(this.workspace.folders.memory, { recursive: true });
+
+    for (const file of allMemoryFiles) {
+      await writeFile(join(this.workspace.folders.memory, file), "", { flag: "a" });
+    }
   }
 }
 

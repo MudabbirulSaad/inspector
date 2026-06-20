@@ -8,6 +8,7 @@ import type {
   InspectionReport,
   KnowledgeCard,
   MemoryEvent,
+  QaIssue,
   QaResult,
 } from "../domain/types.js";
 
@@ -18,6 +19,7 @@ export type SchemaContractName =
   | "qa-result"
   | "knowledge-card"
   | "memory-event"
+  | "qa-issue"
   | "inspection-report";
 
 export interface ContractValidationError {
@@ -41,6 +43,7 @@ export interface SchemaContractValidators {
   "qa-result": ContractValidator<QaResult>;
   "knowledge-card": ContractValidator<KnowledgeCard>;
   "memory-event": ContractValidator<MemoryEvent>;
+  "qa-issue": ContractValidator<QaIssue>;
   "inspection-report": ContractValidator<InspectionReport>;
 }
 
@@ -64,6 +67,7 @@ const contractTitles: Record<SchemaContractName, string> = {
   "qa-result": "QA result",
   "knowledge-card": "Knowledge card",
   "memory-event": "Memory event",
+  "qa-issue": "QA issue",
   "inspection-report": "Inspection report",
 };
 
@@ -92,6 +96,7 @@ export async function createSchemaContractValidators(
       "knowledge-card",
     ),
     "memory-event": createValidator<MemoryEvent>(ajv, schemas, "memory-event"),
+    "qa-issue": createValidator<QaIssue>(ajv, schemas, "qa-issue"),
     "inspection-report": createValidator<InspectionReport>(
       ajv,
       schemas,

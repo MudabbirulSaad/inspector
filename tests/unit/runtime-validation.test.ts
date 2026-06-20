@@ -11,6 +11,7 @@ const runtimeContracts = [
   "qa-result",
   "knowledge-card",
   "memory-event",
+  "qa-issue",
   "inspection-report",
 ] as const;
 
@@ -62,6 +63,10 @@ test("runtime validators reject invalid artifacts for every agent output contrac
     "memory-event": {
       ...(await readExample("memory-event")),
       timestamp: "not-a-date",
+    },
+    "qa-issue": {
+      ...(await readExample("qa-issue")),
+      status: "passed",
     },
     "inspection-report": {
       ...(await readExample("inspection-report")),

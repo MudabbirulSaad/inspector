@@ -49,3 +49,25 @@ export interface RepositoryReader {
 export interface RepositoryIndexWriter {
   writeText(directory: string, path: string, content: string): Promise<void>;
 }
+
+export type SwarmMemoryStream =
+  | "events"
+  | "findings"
+  | "decisions"
+  | "qaIssues"
+  | "verifiedFindings"
+  | "rejectedFindings";
+
+export interface SwarmMemoryStore {
+  appendJsonLine(stream: SwarmMemoryStream, value: unknown): Promise<void>;
+  appendBlackboardSection(markdown: string): Promise<void>;
+}
+
+export interface ValidationPortResult {
+  valid: boolean;
+  errors: { message: string }[];
+}
+
+export interface ArtifactValidator<T> {
+  validate(value: unknown): ValidationPortResult & { value?: T };
+}
