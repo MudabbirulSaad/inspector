@@ -22,6 +22,29 @@ By default, the standalone CLI uses a deterministic fake runner so the pipeline
 can run without network access or a Codex dependency. Configure a process-backed
 runner when you want to invoke a local Codex CLI command.
 
+## At a Glance
+
+| | |
+| --- | --- |
+| **Problem** | AI-assisted repository reviews can produce plausible findings without a durable evidence chain or repeatable quality gate. |
+| **Approach** | Index locally, require schema-valid specialist output, verify cited files and lines, run deterministic QA, and publish approved findings only. |
+| **Status** | Active local CLI. The npm package remains private while release behavior is verified. |
+| **Quality** | Hexagonal TypeScript design, safe command allowlists, resumable run state, fixture-driven end-to-end tests, type checking, and linting. |
+
+## Quick Demonstration
+
+```bash
+npm install
+npm run build
+printf 'Inspect the architecture and testing strategy for reuse opportunities.\n' > objective.md
+npm run dev -- run ./tests/fixtures/tiny-node-app \
+  --objective ./objective.md \
+  --out ./.inspector-runs \
+  --verbose
+```
+
+The default fake runner exercises the complete local pipeline without network calls. A successful run produces repository inventory, specialist attempts, validation and QA artifacts, public case-study Markdown, and evidence-linked RAG cards.
+
 ## What It Does
 
 - Creates an auditable internal run workspace and preserves compatible
