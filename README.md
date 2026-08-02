@@ -22,6 +22,35 @@ By default, the standalone CLI uses a deterministic fake runner so the pipeline
 can run without network access or a Codex dependency. Configure a process-backed
 runner when you want to invoke a local Codex CLI command.
 
+## At a Glance
+
+| | |
+| --- | --- |
+| **Problem** | AI-assisted repository reviews can produce plausible findings without a durable evidence chain or repeatable quality gate. |
+| **Approach** | Index locally, require schema-valid specialist output, verify cited files and lines, run deterministic QA, and publish approved findings only. |
+| **Status** | Active local CLI. The npm package remains private while release behavior is verified. |
+| **Technologies** | TypeScript, Node.js, JSON Schema, Vitest, and dependency-injected process runners. |
+| **Quality** | Hexagonal TypeScript design, safe command allowlists, resumable run state, fixture-driven end-to-end tests, type checking, and linting. |
+| **Verify** | Run `npm run validate` for type checking, linting, unit/integration tests, a clean build, and packed-CLI verification. |
+
+Platform note: on Windows, the aggregate validation currently reaches two known portability failures in packed-CLI process spawning and POSIX-style XDG path expectations. Type checking, linting, and the production build pass; the PR documents those existing limitations rather than presenting the aggregate command as universally green.
+
+## Quick Demonstration
+
+```bash
+npm install
+npm run build
+demo_root="$(mktemp -d)"
+cp -R ./tests/fixtures/tiny-node-app "$demo_root/tiny-node-app"
+printf 'Inspect the architecture and testing strategy for reuse opportunities.\n' > "$demo_root/objective.md"
+npm run dev -- run "$demo_root/tiny-node-app" \
+  --objective "$demo_root/objective.md" \
+  --out "$demo_root/.inspector-runs" \
+  --verbose
+```
+
+The default fake runner exercises the complete local pipeline without network calls or modifying the checked-in fixture. A successful run produces repository inventory, specialist attempts, validation and QA artifacts, public case-study Markdown, and evidence-linked RAG cards inside the temporary directory.
+
 ## What It Does
 
 - Creates an auditable internal run workspace and preserves compatible
