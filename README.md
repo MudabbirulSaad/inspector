@@ -29,7 +29,9 @@ runner when you want to invoke a local Codex CLI command.
 | **Problem** | AI-assisted repository reviews can produce plausible findings without a durable evidence chain or repeatable quality gate. |
 | **Approach** | Index locally, require schema-valid specialist output, verify cited files and lines, run deterministic QA, and publish approved findings only. |
 | **Status** | Active local CLI. The npm package remains private while release behavior is verified. |
+| **Technologies** | TypeScript, Node.js, JSON Schema, Vitest, and dependency-injected process runners. |
 | **Quality** | Hexagonal TypeScript design, safe command allowlists, resumable run state, fixture-driven end-to-end tests, type checking, and linting. |
+| **Verify** | Run `npm run validate` for type checking, linting, unit/integration tests, a clean build, and packed-CLI verification. |
 
 ## Quick Demonstration
 
