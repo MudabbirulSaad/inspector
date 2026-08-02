@@ -33,19 +33,23 @@ runner when you want to invoke a local Codex CLI command.
 | **Quality** | Hexagonal TypeScript design, safe command allowlists, resumable run state, fixture-driven end-to-end tests, type checking, and linting. |
 | **Verify** | Run `npm run validate` for type checking, linting, unit/integration tests, a clean build, and packed-CLI verification. |
 
+Platform note: on Windows, the aggregate validation currently reaches two known portability failures in packed-CLI process spawning and POSIX-style XDG path expectations. Type checking, linting, and the production build pass; the PR documents those existing limitations rather than presenting the aggregate command as universally green.
+
 ## Quick Demonstration
 
 ```bash
 npm install
 npm run build
-printf 'Inspect the architecture and testing strategy for reuse opportunities.\n' > objective.md
-npm run dev -- run ./tests/fixtures/tiny-node-app \
-  --objective ./objective.md \
-  --out ./.inspector-runs \
+demo_root="$(mktemp -d)"
+cp -R ./tests/fixtures/tiny-node-app "$demo_root/tiny-node-app"
+printf 'Inspect the architecture and testing strategy for reuse opportunities.\n' > "$demo_root/objective.md"
+npm run dev -- run "$demo_root/tiny-node-app" \
+  --objective "$demo_root/objective.md" \
+  --out "$demo_root/.inspector-runs" \
   --verbose
 ```
 
-The default fake runner exercises the complete local pipeline without network calls. A successful run produces repository inventory, specialist attempts, validation and QA artifacts, public case-study Markdown, and evidence-linked RAG cards.
+The default fake runner exercises the complete local pipeline without network calls or modifying the checked-in fixture. A successful run produces repository inventory, specialist attempts, validation and QA artifacts, public case-study Markdown, and evidence-linked RAG cards inside the temporary directory.
 
 ## What It Does
 
